@@ -1,3 +1,6 @@
+from app.services.audio.tts_service import TTSService
+
+tts = TTSService()
 import cv2
 import torch
 from ultralytics import YOLO
@@ -115,7 +118,11 @@ while True:
                 track_id=track_id,
                 depth=depth_value
             )
-
+            if status == "CONFIRMED_APPROACHING":
+                tts.speak(
+                    f"{object_name} approaching"
+                )
+ 
             print(
                 f"ID: {track_id} | "
                 f"{object_name} | "

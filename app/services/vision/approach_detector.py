@@ -5,9 +5,10 @@ class ApproachDetector:
     def __init__(self):
         # Store depth history for each tracked object
         self.depth_history = defaultdict(list)
+        self.confirmed_count = defaultdict(int)
 
         # Tuning parameters
-        self.history_size = 5
+        self.history_size = 10
         self.approach_threshold = 30
         self.away_threshold = -30
 
@@ -31,10 +32,22 @@ class ApproachDetector:
         change = newest - oldest
 
         if change > self.approach_threshold:
+
+            self.confirmed_count[track_id] += 1
+
+            if self.confirmed_count[track_id] >= 6:
+                return "CONFIRMED_APPROACHING"
+
             return "APPROACHING"
 
+
         elif change < self.away_threshold:
+
+            self.confirmed_count[track_id] = 0
             return "MOVING_AWAY"
 
+
         else:
+
+            self.confirmed_count[track_id] = 0
             return "STATIONARY"
