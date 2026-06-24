@@ -22,30 +22,35 @@ class ApproachDetector:
         if len(history) > self.history_size:
             history.pop(0)
 
-        # Need enough data before making decisions
-        if len(history) < 3:
+        # Wait until history buffer is full
+        if len(history) < self.history_size:
             return "UNKNOWN"
 
-        oldest = history[0]
-        newest = history[-1]
+        # Split history into two halves
+        first_half = history[:5]
+        second_half = history[-5:]
 
-        change = newest - oldest
+        # Compute average depth for each half
+        old_avg = sum(first_half) / len(first_half)
+        new_avg = sum(second_half) / len(second_half)
+
+        # Positive = approaching
+        # Negative = moving away
+        change = new_avg - old_avg
 
         if change > self.approach_threshold:
 
             self.confirmed_count[track_id] += 1
 
-            if self.confirmed_count[track_id] >= 6:
+            if self.confirmed_count[track_id] >= 4:
                 return "CONFIRMED_APPROACHING"
 
             return "APPROACHING"
-
 
         elif change < self.away_threshold:
 
             self.confirmed_count[track_id] = 0
             return "MOVING_AWAY"
-
 
         else:
 
