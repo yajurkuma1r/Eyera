@@ -12,8 +12,8 @@ class AssistantService:
     and optionally speaks the response.
     """
 
-    def __init__(self):
-        self.llm = LLMService()
+    def __init__(self, model: str = "gpt-5.6-luna"):
+        self.llm = LLMService(model=model)
         self.tts = TTSService()
 
     def process(
@@ -40,7 +40,7 @@ class AssistantService:
         return response
 
 
-if __name__ == "__main__":
+def main():
 
     assistant = AssistantService()
 
@@ -69,4 +69,8 @@ if __name__ == "__main__":
 
         except Exception as error:
 
-            print(f"Error: {error}")
+            print(f"[ERROR] {error}")
+
+
+if __name__ == "__main__":
+    main()
