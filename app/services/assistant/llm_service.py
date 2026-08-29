@@ -5,7 +5,7 @@ from openai import OpenAI
 
 class LLMService:
     """
-    Handles communication with the LLM.
+    Handles communication with the OpenAI LLM.
     """
 
     def __init__(self, model: str = "gpt-5.6-luna"):
@@ -35,7 +35,7 @@ Rules:
 - Use natural spoken language.
 - Do not use markdown.
 - Never invent visual information.
-- Only use objects, text, distances, or other visual information provided to you.
+- Only use visual information provided by the vision system.
 - If visual information is unavailable, say so clearly.
 - For safety-related situations, state the important warning first.
 """
@@ -48,7 +48,7 @@ User request:
 Visual information from Eyera's vision system:
 {visual_context}
 
-Answer the user's request using only relevant visual information.
+Answer the user's request using only the relevant visual information.
 """
         else:
             user_input = f"""
