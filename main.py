@@ -7,7 +7,7 @@ def main():
     print("The old Navigation Mode implementation has been rebuilt from scratch.")
     print("The main application is now located at: app/services/navigation/app.py")
     print("\nTo start the new 4-screen synchronized navigation mode, run:")
-    print("    python run_navigation.py")
+    print("    python app/services/navigation/run_navigation.py")
     print("==================================================")
     sys.exit(0)
 

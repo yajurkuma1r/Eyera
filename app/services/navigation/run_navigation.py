@@ -6,7 +6,18 @@ import time
 import uvicorn
 from dotenv import load_dotenv
 
-# Load env variables from .env before starting
+# Calculate project root directory (three levels up from this script)
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+# Add project root to sys.path so we can import 'app' module
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
+# Change current working directory to project root so that all relative file paths
+# (like .env and model files) resolve correctly.
+os.chdir(root_dir)
+
+# Load env variables from .env
 load_dotenv()
 
 def open_browser():

@@ -5,6 +5,7 @@ import time
 import queue
 import threading
 import pythoncom
+import tempfile
 
 
 class TTSService:
@@ -80,7 +81,8 @@ class TTSService:
                     self.active_message = message
 
                 # Create unique temp file to avoid permission conflicts on disk
-                temp_filename = f"tts_{threading.get_ident()}_{int(time.time() * 1000)}.mp3"
+                temp_dir = tempfile.gettempdir()
+                temp_filename = os.path.join(temp_dir, f"tts_{threading.get_ident()}_{int(time.time() * 1000)}.mp3")
                 
                 play_success = False
                 try:
