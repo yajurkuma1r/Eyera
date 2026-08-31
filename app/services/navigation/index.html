@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eyera Smart Glasses — Navigation Hub</title>
+    
+    <!-- Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet.js CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Inline Styling (Vanilla CSS for Premium Dark Glassmorphism Aesthetics) -->
+    <style>
+        :root {
+            --bg-darkest: #07080b;
+            --bg-main: #0c0d13;
+            --bg-card: rgba(18, 20, 32, 0.6);
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.07);
+            --accent-blue: #3b82f6;
+            --accent-blue-glow: rgba(59, 130, 246, 0.35);
+            --accent-green: #10b981;
+            --accent-green-glow: rgba(16, 185, 129, 0.35);
+            --accent-red: #ef4444;
+            --accent-red-glow: rgba(239, 68, 68, 0.35);
+            --accent-orange: #f59e0b;
+            --accent-orange-glow: rgba(245, 158, 11, 0.35);
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-darkest);
+            background-image: radial-gradient(circle at 50% 0%, #151a30 0%, var(--bg-darkest) 75%);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header Style */
+        header {
+            padding: 16px 30px;
+            background: rgba(7, 8, 11, 0.6);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-glass);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            background: linear-gradient(135deg, #60a5fa, #818cf8, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-indicator.ready {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .status-indicator.loading {
+            background: var(--accent-orange);
+            box-shadow: 0 0 8px var(--accent-orange);
+            animation: pulse-warn 1s infinite alternate;
+        }
+
+        @keyframes pulse-warn {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* 2x2 Screen Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
+            flex-grow: 1;
+            height: calc(100vh - 66px);
+            box-sizing: border-box;
+        }
+
+        /* Card Container Styles */
+        .screen-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .screen-card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Screen Header */
+        .screen-header {
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-glass);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .screen-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .screen-num {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 10px;
+        }
+
+        .zoom-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .screen-content {
+            flex-grow: 1;
+            overflow: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Fullscreen Expansion */
+        .screen-card.fullscreen-mode {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            z-index: 100;
+            height: calc(100vh - 40px);
+            width: calc(100vw - 40px);
+        }
+
+        .grid-hidden {
+            display: none !important;
+        }
+
+        /* ========================================================
+           SCREEN 1: Live Camera Specifics
+           ======================================================== */
+        #camera-container {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        #camera-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-overlay-stats {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--border-glass);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-family: monospace;
+            color: var(--accent-green);
+        }
+
+        /* ========================================================
+           SCREEN 2: Map Specifics
+           ======================================================== */
+        #map-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            /* CSS invert filter creates a high-tech custom dark map theme */
+            filter: invert(0.9) hue-rotate(180deg) brightness(0.9) contrast(1.1);
+        }
+
+        #fallback-map-canvas {
+            width: 100%;
+            height: 100%;
+            background: #0b0c10;
+        }
+
+        .map-info-card {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            background: rgba(18, 20, 32, 0.9);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            z-index: 5;
+        }
+
+        .map-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .map-info-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .map-info-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* ========================================================
+           SCREEN 3: Start / Destination Settings
+           ======================================================== */
+        .controls-wrapper {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .text-input {
+            flex-grow: 1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            color: var(--text-primary);
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .select-input {
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: rgba(18, 20, 32, 0.9);
+            border: 1px solid var(--border-glass);
+            color: var(--text-primary);
+            outline: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Pulsing Mic Button for STT */
+        .voice-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .mic-button {
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--accent-blue), #6366f1);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px var(--accent-blue-glow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .mic-button.recording {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            animation: pulse-recording 1.5s infinite;
+            box-shadow: 0 4px 22px var(--accent-red-glow);
+        }
+
+        @keyframes pulse-recording {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .mic-icon-svg {
+            width: 28px;
+            height: 28px;
+            fill: currentColor;
+        }
+
+        .voice-status-text {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-align: center;
+            min-height: 18px;
+        }
+
+        /* Preset Destination Chips */
+        .presets-title {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .preset-chip {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .preset-chip:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: var(--text-primary);
+        }
+
+        /* Start/Stop Button styles */
+        .btn-action {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-start {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 4px 12px var(--accent-blue-glow);
+        }
+
+        .btn-start:hover {
+            background: #2563eb;
+        }
+
+        .btn-stop {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+        }
+
+        .btn-stop:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        /* ========================================================
+           SCREEN 4: Real-time HUD (Directions & Safety)
+           ======================================================== */
+        .hud-wrapper {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+            justify-content: center;
+        }
+
+        /* Normal Direction View */
+        .direction-hud-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .direction-icon-wrapper {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .direction-icon-svg {
+            width: 26px;
+            height: 26px;
+            fill: currentColor;
+        }
+
+        .direction-text-block {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-grow: 1;
+        }
+
+        .direction-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .direction-msg {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .direction-distance {
+            font-size: 13px;
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        /* Dynamic Progress Bar */
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-blue);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        /* Safety Warning HUD */
+        .safety-warning-hud {
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        /* Safe Clear State */
+        .safety-warning-hud.clear {
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--accent-green);
+        }
+
+        /* Warning Active Flashing State */
+        .safety-warning-hud.active-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border: 2px solid var(--accent-red);
+            color: var(--text-primary);
+            animation: flash-red-hud 0.8s infinite alternate;
+            box-shadow: 0 0 20px var(--accent-red-glow);
+        }
+
+        @keyframes flash-red-hud {
+            0% { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.6); }
+            100% { background: rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 1); }
+        }
+
+        .warning-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .warning-subtitle {
+            font-size: 13px;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .warning-icon-pulsing {
+            font-size: 32px;
+            margin-bottom: 4px;
+        }
+
+        /* Warnings Timeline Log */
+        .warnings-log-container {
+            margin-top: 10px;
+        }
+        
+        .log-title {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .warnings-log {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 90px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .log-msg {
+            font-weight: 600;
+        }
+
+        .log-msg.approaching { color: var(--accent-orange); }
+        .log-msg.very_close { color: var(--accent-red); }
+        .log-msg.ahead { color: var(--accent-blue); }
+
+        .log-time {
+            color: var(--text-muted);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+                height: auto;
+                overflow-y: auto;
+            }
+            .screen-card {
+                height: 380px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-logo">
+            <svg style="width: 28px; height: 28px;" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="#60a5fa"/>
+            </svg>
+            <span class="logo-text">Eyera Navigation Hub</span>
+        </div>
+        <div class="status-badge" id="system-status-badge">
+            <span class="status-indicator" id="system-status-dot"></span>
+            <span id="system-status-text">Disconnected</span>
+        </div>
+    </header>
+
+    <div class="dashboard-grid" id="main-dashboard-grid">
+        
+        <!-- ========================================================
+           SCREEN 1: Live Camera
+           ======================================================== -->
+        <div class="screen-card" id="card-screen-1">
+            <div class="screen-header">
+                <div class="screen-title">
+                    <span class="screen-num">Screen 1</span>
+                    <span>Live Camera Overlay</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <select id="vision-mode-select" class="select-input" style="padding: 4px 8px; font-size: 11px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-glass); border-radius: 6px; color: var(--text-primary);" onchange="onVisionModeChange()">
+                        <option value="smooth">Live Smooth (Raw)</option>
+                        <option value="overlay">Debug Overlays (ML)</option>
+                    </select>
+                    <button class="zoom-btn" onclick="toggleFullscreen('card-screen-1')" title="Toggle Fullscreen">
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="screen-content">
+                <div id="camera-container">
+                    <img id="camera-stream" src="" alt="Initialising Camera / Simulated Scanner..." />
+                    <div class="camera-overlay-stats" id="camera-stats">FPS: -- | MODE: --</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================
+           SCREEN 2: Map & Walking Directions
+           ======================================================== -->
+        <div class="screen-card" id="card-screen-2">
+            <div class="screen-header">
+                <div class="screen-title">
+                    <span class="screen-num">Screen 2</span>
+                    <span>Walking Map Direction</span>
+                </div>
+                <button class="zoom-btn" onclick="toggleFullscreen('card-screen-2')" title="Toggle Fullscreen">
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="screen-content">
+                <div id="map-container">
+                    <div id="map"></div>
+                    <canvas id="fallback-map-canvas" class="grid-hidden"></canvas>
+                    
+                    <div class="map-info-card grid-hidden" id="map-info-overlay">
+                        <div class="map-info-item">
+                            <span class="map-info-label">Route ETA</span>
+                            <span class="map-info-val" id="map-val-eta">-- min</span>
+                        </div>
+                        <div class="map-info-item" style="text-align: right;">
+                            <span class="map-info-label">Distance Left</span>
+                            <span class="map-info-val" id="map-val-dist">-- m</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================
+           SCREEN 3: Start / Destination Settings
+           ======================================================== -->
+        <div class="screen-card" id="card-screen-3">
+            <div class="screen-header">
+                <div class="screen-title">
+                    <span class="screen-num">Screen 3</span>
+                    <span>Start / Destination Control</span>
+                </div>
+                <button class="zoom-btn" onclick="toggleFullscreen('card-screen-3')" title="Toggle Fullscreen">
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="screen-content">
+                <div class="controls-wrapper">
+                    <!-- Configurable Start Position Selector -->
+                    <div class="form-group">
+                        <label class="form-label">Starting Position (Configurable GPS)</label>
+                        <div class="input-row">
+                            <select id="start-preset-select" class="select-input" onchange="onPresetLocationChange()">
+                                <option value="delhi">Delhi, India (India Gate)</option>
+                                <option value="manhattan">Manhattan, NY (Empire State)</option>
+                                <option value="london">London, UK (Trafalgar Sq)</option>
+                                <option value="custom">Custom Coordinates</option>
+                            </select>
+                            <input type="text" id="coord-input-lon" class="text-input grid-hidden" placeholder="Lon" value="77.2295" />
+                            <input type="text" id="coord-input-lat" class="text-input grid-hidden" placeholder="Lat" value="28.6129" />
+                        </div>
+                    </div>
+
+                    <!-- Destination Input -->
+                    <div class="form-group">
+                        <label class="form-label">Destination Address</label>
+                        <input type="text" id="destination-input" class="text-input" placeholder="Type destination or tap Voice Button..." />
+                    </div>
+
+                    <!-- Voice-First Microphone Section -->
+                    <div class="voice-section">
+                        <button class="mic-button" id="mic-trigger-btn" onclick="toggleVoiceInput()" title="Tap to Speak Destination">
+                            <svg class="mic-icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                            </svg>
+                        </button>
+                        <div class="voice-status-text" id="voice-transcript">Speak: "Take me to India Gate"</div>
+                    </div>
+
+                    <!-- Preset Chips -->
+                    <div class="form-group">
+                        <label class="presets-title">Quick Search Categories</label>
+                        <div class="chips-container">
+                            <button class="preset-chip" onclick="clickPreset('nearest hospital')">🏥 Nearest Hospital</button>
+                            <button class="preset-chip" onclick="clickPreset('nearest pharmacy')">💊 Nearest Pharmacy</button>
+                            <button class="preset-chip" onclick="clickPreset('India Gate')">🇮🇳 India Gate</button>
+                            <button class="preset-chip" onclick="clickPreset('Central Park')">🌳 Central Park</button>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Action trigger -->
+                    <div class="form-group" style="margin-top: 10px;">
+                        <button id="nav-action-btn" class="btn-action btn-start" onclick="toggleNavigation()">Start Walking Navigation</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================
+           SCREEN 4: HUD & Object Alarms
+           ======================================================== -->
+        <div class="screen-card" id="card-screen-4">
+            <div class="screen-header">
+                <div class="screen-title">
+                    <span class="screen-num">Screen 4</span>
+                    <span>HUD Directions & Object Warnings</span>
+                </div>
+                <button class="zoom-btn" onclick="toggleFullscreen('card-screen-4')" title="Toggle Fullscreen">
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="screen-content" style="background: #090a0e;">
+                <div class="hud-wrapper">
+                    
+                    <!-- Safety Alarm HUD -->
+                    <div class="safety-warning-hud clear" id="safety-hud-status">
+                        <div class="warning-icon-pulsing" id="safety-hud-icon">🛡️</div>
+                        <div class="warning-title" id="safety-hud-msg">PATH CLEAR</div>
+                        <div class="warning-subtitle">Eye-safety pipeline scanning...</div>
+                    </div>
+
+                    <!-- Directives Card -->
+                    <div class="direction-hud-card">
+                        <div class="direction-icon-wrapper" id="hud-dir-icon-container">
+                            <!-- Default Straight arrow SVG -->
+                            <svg class="direction-icon-svg" viewBox="0 0 24 24" id="hud-dir-icon">
+                                <path d="M12 2L4.5 9.5h5V22h5V9.5h5z"/>
+                            </svg>
+                        </div>
+                        <div class="direction-text-block">
+                            <span class="direction-label">Walking Instruction</span>
+                            <span class="direction-msg" id="hud-dir-msg">Not Navigating</span>
+                            <span class="direction-distance" id="hud-dir-distance">Maneuver: --</span>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" id="hud-dir-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manual speech trigger button -->
+                    <div style="margin-top: 10px; margin-bottom: 15px; width: 100%;">
+                        <button id="speak-direction-btn" class="btn-action" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--accent-blue); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px;" onclick="speakNextDirection()">
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                            </svg>
+                            Speak Next Direction
+                        </button>
+                    </div>
+
+                    <!-- Warning Log -->
+                    <div class="warnings-log-container">
+                        <div class="log-title">Auditory warnings log</div>
+                        <div class="warnings-log" id="warnings-history-log">
+                            <div class="log-item" style="justify-content: center; color: var(--text-muted);">No warning alarms spoken yet</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ---------------------------------------------------------------------- -->
+    <!-- Script Logic: Communication, Maps, and Speech STT -->
+    <!-- ---------------------------------------------------------------------- -->
+    <script>
+        // Global variables
+        let socket = null;
+        let tomtomKey = "";
+        let map = null;
+        let routePolyline = null;
+        let currentPosMarker = null;
+        let destPosMarker = null;
+        
+        let sessionActive = false;
+        let recentWarningsLog = [];
+        let zoomScaleTarget = null;
+        let currentInstruction = "Not Navigating";
+        let distanceToNext = 0.0;
+        
+        // Location coordinates database
+        const LOCATION_PRESETS = {
+            delhi: { lon: 77.2295, lat: 28.6129 },
+            manhattan: { lon: -73.9857, lat: 40.7484 },
+            london: { lon: -0.1276, lat: 51.5072 }
+        };
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchConfig();
+            initWebSocket();
+            initSpeechRecognition();
+            requestCurrentLocation();
+            
+            // Listen to manual coordinates changes
+            document.getElementById("coord-input-lon").addEventListener("change", () => {
+                const lat = parseFloat(document.getElementById("coord-input-lat").value);
+                const lon = parseFloat(document.getElementById("coord-input-lon").value);
+                sendStartCoordsToBackend(lat, lon);
+            });
+            document.getElementById("coord-input-lat").addEventListener("change", () => {
+                const lat = parseFloat(document.getElementById("coord-input-lat").value);
+                const lon = parseFloat(document.getElementById("coord-input-lon").value);
+                sendStartCoordsToBackend(lat, lon);
+            });
+        });
+
+
+        // 1. Fetch startup config
+        async function fetchConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                tomtomKey = data.tomtom_key;
+                
+                // Update system header badges
+                updateStatusBadge(data.camera_status, data.vision_status);
+                
+                // Setup Map
+                initLeafletMap();
+            } catch (err) {
+                console.error("Config fetch failed: ", err);
+                initLeafletMap();
+            }
+        }
+
+        function updateStatusBadge(cam, vis) {
+            const dot = document.getElementById("system-status-dot");
+            const txt = document.getElementById("system-status-text");
+            
+            dot.className = "status-indicator";
+            if (cam === "Connected" && vis === "Ready") {
+                dot.classList.add("ready");
+                txt.innerText = "System Online";
+            } else if (cam === "Simulated" || vis.includes("Loading")) {
+                dot.classList.add("loading");
+                txt.innerText = vis.includes("Loading") ? "Loading Models..." : "System Simulated";
+            } else {
+                txt.innerText = "Error: " + (cam === "Error" ? "Camera" : "Vision");
+            }
+        }
+
+        // 2. Initialize WebSocket Connection
+        function initWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/navigation`;
+            
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = () => {
+                console.log("[WS Connected]");
+            };
+            
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === "speech") {
+                    speakTextFrontend(data.text);
+                } else {
+                    synchronizeScreens(data);
+                }
+            };
+            
+            socket.onclose = () => {
+                console.warn("[WS Closed]. Reconnecting in 3s...");
+                setTimeout(initWebSocket, 3000);
+            };
+            
+            socket.onerror = (err) => {
+                console.error("[WS Error]", err);
+            };
+        }
+
+        // 3. Screen Synchronization Engine (Updates all 4 views)
+        function synchronizeScreens(state) {
+            sessionActive = state.active;
+            
+            // System header status update
+            updateStatusBadge(state.camera_status, state.vision_status);
+
+            // ----------------------------------------------------
+            // SCREEN 1: Camera stream
+            // ----------------------------------------------------
+            const streamImg = document.getElementById("camera-stream");
+            if (state.frame) {
+                streamImg.src = state.frame;
+            }
+            
+            const stats = document.getElementById("camera-stats");
+            stats.innerText = `CAM: ${state.camera_status.toUpperCase()} | VIS: ${state.vision_status.toUpperCase()} | TIME: ${state.elapsed_time.toFixed(1)}s`;
+
+            const visionSelect = document.getElementById("vision-mode-select");
+            if (visionSelect && state.vision_mode && visionSelect.value !== state.vision_mode) {
+                visionSelect.value = state.vision_mode;
+            }
+
+
+            // ----------------------------------------------------
+            // SCREEN 2: Map rendering
+            // ----------------------------------------------------
+            const infoOverlay = document.getElementById("map-info-overlay");
+            if (state.active) {
+                infoOverlay.classList.remove("grid-hidden");
+                
+                // ETA calculations
+                const etaMin = Math.ceil(state.total_duration / 60 - state.elapsed_time / 60);
+                const distM = Math.max(0, Math.round(state.total_distance - (state.elapsed_time * state.speed_mps)));
+                document.getElementById("map-val-eta").innerText = `${Math.max(0, etaMin)} min`;
+                document.getElementById("map-val-dist").innerText = `${distM} m`;
+                
+                // Draw route on Leaflet Map
+                if (map && state.route && state.route.length > 0) {
+                    drawLeafletRoute(state.route, state.current_position, state.dest_coords);
+                } else if (map && state.current_position) {
+                    drawLeafletRoute([], state.current_position, null);
+                }
+            } else {
+                infoOverlay.classList.add("grid-hidden");
+                clearRouteVisuals();
+                if (map && state.current_position) {
+                    drawLeafletRoute([], state.current_position, null);
+                }
+            }
+
+            // ----------------------------------------------------
+            // SCREEN 3: Start / Destination panel buttons state
+            // ----------------------------------------------------
+            const navBtn = document.getElementById("nav-action-btn");
+            if (state.active) {
+                navBtn.innerText = "Stop Walking Navigation";
+                navBtn.className = "btn-action btn-stop";
+            } else {
+                navBtn.innerText = "Start Walking Navigation";
+                navBtn.className = "btn-action btn-start";
+            }
+
+            // ----------------------------------------------------
+            // SCREEN 4: HUD & warnings
+            // ----------------------------------------------------
+            const hudDirMsg = document.getElementById("hud-dir-msg");
+            const hudDirDist = document.getElementById("hud-dir-distance");
+            const progressFill = document.getElementById("hud-dir-progress-fill");
+            
+            if (state.active) {
+                currentInstruction = state.current_instruction || "Proceed straight";
+                distanceToNext = state.distance_to_next || 0.0;
+                hudDirMsg.innerText = state.current_instruction;
+                
+                // Calculate turn progress bar percent
+                if (state.distance_to_next > 0) {
+                    hudDirDist.innerText = `In ${Math.round(state.distance_to_next)} metres`;
+                    // Assume typical segment is 50m for visual progress
+                    const pct = Math.max(0, Math.min(100, (1 - (state.distance_to_next / 50)) * 100));
+                    progressFill.style.width = `${pct}%`;
+                } else {
+                    hudDirDist.innerText = "Maneuver: straight ahead";
+                    progressFill.style.width = "0%";
+                }
+                
+                // Update HUD Direction arrow based on instruction
+                updateHudArrow(state.current_instruction);
+            } else {
+                currentInstruction = "Not Navigating";
+                distanceToNext = 0.0;
+                hudDirMsg.innerText = "Not Navigating";
+                hudDirDist.innerText = "Session Idle";
+                progressFill.style.width = "0%";
+                setArrowIcon("straight");
+            }
+
+            // Handle HUD Safety warning alarm panels
+            const hudSafety = document.getElementById("safety-hud-status");
+            const hudSafetyIcon = document.getElementById("safety-hud-icon");
+            const hudSafetyMsg = document.getElementById("safety-hud-msg");
+            
+            if (state.active && state.warnings && state.warnings.length > 0) {
+                const w = state.warnings[0];
+                hudSafety.className = "safety-warning-hud active-danger";
+                
+                if (w.type === "very_close") {
+                    hudSafetyIcon.innerText = "🚨";
+                    hudSafetyMsg.innerText = "VERY CLOSE";
+                } else if (w.type === "approaching") {
+                    hudSafetyIcon.innerText = "⚠️";
+                    hudSafetyMsg.innerText = w.message.toUpperCase();
+                } else {
+                    hudSafetyIcon.innerText = "🚧";
+                    hudSafetyMsg.innerText = w.message.toUpperCase();
+                }
+                
+                // Log spoken warnings
+                logWarningToHistory(w.message, w.type);
+            } else {
+                hudSafety.className = "safety-warning-hud clear";
+                hudSafetyIcon.innerText = "🛡️";
+                hudSafetyMsg.innerText = "PATH CLEAR";
+            }
+        }
+
+        // Helper: dynamic direction matching
+        function updateHudArrow(msg) {
+            const txt = msg.toLowerCase();
+            if (txt.includes("turn left") || txt.includes("bear left") || txt.includes("take the left")) {
+                setArrowIcon("left");
+            } else if (txt.includes("turn right") || txt.includes("bear right") || txt.includes("take the right")) {
+                setArrowIcon("right");
+            } else if (txt.includes("reached") || txt.includes("arrived")) {
+                setArrowIcon("arrive");
+            } else {
+                setArrowIcon("straight");
+            }
+        }
+
+        function setArrowIcon(direction) {
+            const svg = document.getElementById("hud-dir-icon");
+            let path = "";
+            if (direction === "left") {
+                path = '<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>';
+            } else if (direction === "right") {
+                path = '<path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>';
+            } else if (direction === "arrive") {
+                path = '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>';
+            } else { // straight
+                path = '<path d="M12 2L4.5 9.5h5V22h5V9.5h5z"/>';
+            }
+            svg.innerHTML = path;
+        }
+
+        function logWarningToHistory(message, type) {
+            const lastItem = recentWarningsLog[0];
+            const nowText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            
+            // Avoid duplicate log line spams in timeline
+            if (lastItem && lastItem.message === message && (Date.now() - lastItem.time < 3000)) {
+                return;
+            }
+            
+            recentWarningsLog.unshift({message, type, time: Date.now(), timeStr: nowText});
+            if (recentWarningsLog.length > 3) {
+                recentWarningsLog.pop();
+            }
+            
+            const logBox = document.getElementById("warnings-history-log");
+            logBox.innerHTML = recentWarningsLog.map(item => `
+                <div class="log-item">
+                    <span class="log-msg ${item.type}">${item.message}</span>
+                    <span class="log-time">${item.timeStr}</span>
+                </div>
+            `).join('');
+        }
+
+        // ========================================================
+        // Preset Controllers (Screen 3)
+        // ========================================================
+        function onPresetLocationChange() {
+            const select = document.getElementById("start-preset-select");
+            const lonIn = document.getElementById("coord-input-lon");
+            const latIn = document.getElementById("coord-input-lat");
+            
+            if (select.value === "custom") {
+                lonIn.classList.remove("grid-hidden");
+                latIn.classList.remove("grid-hidden");
+            } else {
+                lonIn.classList.add("grid-hidden");
+                latIn.classList.add("grid-hidden");
+                
+                const coords = LOCATION_PRESETS[select.value];
+                lonIn.value = coords.lon;
+                latIn.value = coords.lat;
+                
+                if (map) {
+                    map.setView([coords.lat, coords.lon]);
+                }
+                
+                sendStartCoordsToBackend(coords.lat, coords.lon);
+            }
+        }
+
+
+        function onVisionModeChange() {
+            const select = document.getElementById("vision-mode-select");
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    action: "set_vision_mode",
+                    mode: select.value
+                }));
+            }
+        }
+
+        function sendStartCoordsToBackend(lat, lon) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    action: "set_start_coords",
+                    lat: lat,
+                    lon: lon
+                }));
+            }
+        }
+
+        function requestCurrentLocation() {
+            if (navigator.geolocation) {
+                document.getElementById("voice-transcript").innerText = "Requesting current GPS coordinates...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        console.log(`[GPS Coordinates]: ${lat}, ${lon}`);
+                        
+                        document.getElementById("coord-input-lat").value = lat;
+                        document.getElementById("coord-input-lon").value = lon;
+                        
+                        // Add Current GPS dynamically to select
+                        const select = document.getElementById("start-preset-select");
+                        
+                        // Clear any old current location options
+                        for (let i = 0; i < select.options.length; i++) {
+                            if (select.options[i].value === "current") {
+                                select.remove(i);
+                                break;
+                            }
+                        }
+                        
+                        const option = document.createElement("option");
+                        option.value = "current";
+                        option.text = `Current GPS (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+                        select.add(option, select.options[0]);
+                        select.selectedIndex = 0;
+                        
+                        LOCATION_PRESETS["current"] = { lon: lon, lat: lat };
+                        
+                        if (map) {
+                            map.setView([lat, lon]);
+                        }
+                        
+                        // Wait for WebSocket to be ready
+                        setTimeout(() => {
+                            sendStartCoordsToBackend(lat, lon);
+                        }, 1200);
+                        
+                        document.getElementById("voice-transcript").innerText = "Pre-defined current location as start point.";
+                    },
+                    (error) => {
+                        console.warn("[GPS Access Error] GPS unavailable. Defaulting to Delhi preset.", error);
+                        document.getElementById("voice-transcript").innerText = "GPS unavailable. Using default Delhi start.";
+                        onPresetLocationChange();
+                    },
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                );
+            } else {
+                document.getElementById("voice-transcript").innerText = "Geolocation not supported by browser.";
+            }
+        }
+
+        function clickPreset(dest) {
+
+            document.getElementById("destination-input").value = dest;
+
+            if (!sessionActive) {
+                toggleNavigation();
+            }
+        }
+
+        function toggleNavigation() {
+            const destInput = document.getElementById("destination-input");
+            const dest = destInput.value.trim();
+            
+            if (sessionActive) {
+                // STOP NAV
+                socket.send(JSON.stringify({ action: "stop_nav" }));
+            } else {
+                // START NAV
+                if (!dest) {
+                    alert("Please enter or speak a destination address first!");
+                    return;
+                }
+                
+                const lon = parseFloat(document.getElementById("coord-input-lon").value);
+                const lat = parseFloat(document.getElementById("coord-input-lat").value);
+                
+                socket.send(JSON.stringify({
+                    action: "start_nav",
+                    destination: dest,
+                    start_lat: lat,
+                    start_lon: lon
+                }));
+            }
+        }
+
+        // ========================================================
+        // Voice Input (Speech-To-Text) via Web Speech API
+        // ========================================================
+        let recognition = null;
+        let isRecording = false;
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                document.getElementById("voice-transcript").innerText = "Voice input unsupported by this browser. Type destination.";
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onstart = () => {
+                isRecording = true;
+                const mic = document.getElementById("mic-trigger-btn");
+                mic.classList.add("recording");
+                document.getElementById("voice-transcript").innerText = "Listening... speak now";
+                
+                // Speak audio cue through backend TTS (optional debug check)
+                socket.send(JSON.stringify({ action: "speak", text: "Where would you like to go?" }));
+            };
+            
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                console.log("[STT Heard]: ", speechResult);
+                document.getElementById("voice-transcript").innerText = `Heard: "${speechResult}"`;
+                document.getElementById("destination-input").value = speechResult;
+                
+                // Dispatch Voice input action
+                const lon = parseFloat(document.getElementById("coord-input-lon").value);
+                const lat = parseFloat(document.getElementById("coord-input-lat").value);
+                
+                socket.send(JSON.stringify({
+                    action: "voice_input",
+                    text: speechResult,
+                    start_lat: lat,
+                    start_lon: lon
+                }));
+            };
+            
+            recognition.onerror = (err) => {
+                console.error("[STT Error]", err);
+                document.getElementById("voice-transcript").innerText = "Error capturing speech. Try again.";
+                stopSpeechRecog();
+            };
+            
+            recognition.onend = () => {
+                stopSpeechRecog();
+            };
+        }
+
+        function stopSpeechRecog() {
+            isRecording = false;
+            const mic = document.getElementById("mic-trigger-btn");
+            mic.classList.remove("recording");
+        }
+
+        function toggleVoiceInput() {
+            if (!recognition) return;
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        // ========================================================
+        // Map Rendering Engines (Leaflet.js)
+        // ========================================================
+        function initLeafletMap() {
+            try {
+                const select = document.getElementById("start-preset-select");
+                const coords = LOCATION_PRESETS[select.value] || { lon: 77.2295, lat: 28.6129 };
+                
+                // If map is already initialized, just set the view
+                if (map) {
+                    map.setView([coords.lat, coords.lon], 15);
+                    return;
+                }
+                
+                // Initialize map
+                map = L.map('map').setView([coords.lat, coords.lon], 15);
+                
+                // Add OpenStreetMap tiles layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(map);
+
+                console.log("[Leaflet Map Loaded]");
+            } catch (e) {
+                console.error("Leaflet map render failed: ", e);
+                initFallbackMap();
+            }
+        }
+
+        function initFallbackMap() {
+            console.log("[Fallback Map Stub]");
+        }
+
+        function drawLeafletRoute(routeGeom, currentPos, destPos) {
+            if (!map) return;
+            
+            // routeGeom is an array of [lon, lat] from backend
+            const latLngs = (routeGeom && routeGeom.length > 0) ? routeGeom.map(coords => [coords[1], coords[0]]) : [];
+            const currentLatLng = [currentPos[1], currentPos[0]];
+            const destLatLng = destPos ? [destPos[1], destPos[0]] : null;
+            
+            // Draw path lines
+            if (latLngs.length > 0) {
+                if (routePolyline) {
+                    routePolyline.setLatLngs(latLngs);
+                } else {
+                    routePolyline = L.polyline(latLngs, {
+                        color: '#3b82f6',
+                        weight: 6,
+                        lineCap: 'round',
+                        lineJoin: 'round'
+                    }).addTo(map);
+                }
+            } else {
+                if (routePolyline) {
+                    routePolyline.remove();
+                    routePolyline = null;
+                }
+            }
+            
+            // Markers
+            if (currentPosMarker) currentPosMarker.remove();
+            if (destPosMarker) destPosMarker.remove();
+            
+            // Create user position marker element
+            const userEl = document.createElement('div');
+            userEl.style.width = '18px';
+            userEl.style.height = '18px';
+            userEl.style.borderRadius = '50%';
+            userEl.style.backgroundColor = '#3b82f6';
+            userEl.style.border = '3px solid #ffffff';
+            userEl.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.8)';
+            
+            const userIcon = L.divIcon({
+                html: userEl,
+                className: 'custom-user-icon',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+            currentPosMarker = L.marker(currentLatLng, { icon: userIcon }).addTo(map);
+                
+            if (destLatLng) {
+                const destEl = document.createElement('div');
+                destEl.style.width = '16px';
+                destEl.style.height = '16px';
+                destEl.style.borderRadius = '50%';
+                destEl.style.backgroundColor = '#ef4444';
+                destEl.style.border = '3px solid #ffffff';
+                destEl.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.8)';
+                
+                const destIcon = L.divIcon({
+                    html: destEl,
+                    className: 'custom-dest-icon',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+                destPosMarker = L.marker(destLatLng, { icon: destIcon }).addTo(map);
+            }
+            
+            // Recenter map occasionally
+            if (latLngs.length > 0) {
+                if (zoomScaleTarget !== latLngs.length) {
+                    const bounds = L.latLngBounds(latLngs);
+                    map.fitBounds(bounds, { padding: [40, 40] });
+                    zoomScaleTarget = latLngs.length;
+                } else {
+                    map.setView(currentLatLng);
+                }
+            } else {
+                map.setView(currentLatLng);
+            }
+        }
+
+        function clearRouteVisuals() {
+            zoomScaleTarget = null;
+            if (map) {
+                if (routePolyline) {
+                    routePolyline.remove();
+                    routePolyline = null;
+                }
+                if (currentPosMarker) { currentPosMarker.remove(); currentPosMarker = null; }
+                if (destPosMarker) { destPosMarker.remove(); destPosMarker = null; }
+            }
+        }
+
+        // Manual speak next direction prompt
+        function speakNextDirection() {
+            if (!sessionActive) {
+                speakTextFrontend("Navigation is currently idle. Please set a destination first.");
+                return;
+            }
+            
+            let textToSpeak = "";
+            if (distanceToNext > 0) {
+                textToSpeak = `In ${Math.round(distanceToNext)} metres, ${currentInstruction}`;
+            } else {
+                textToSpeak = currentInstruction;
+            }
+            
+            speakTextFrontend(textToSpeak);
+        }
+
+        // Voice output via Web Speech API in frontend browser
+        function speakTextFrontend(text) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech to avoid overlap
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                // Prefer a natural-sounding English voice if available
+                const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+                if (englishVoice) {
+                    utterance.voice = englishVoice;
+                }
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+                console.log("[SpeechSynthesis] Spoke in browser: ", text);
+            } else {
+                console.warn("[SpeechSynthesis] Web Speech API is not supported in this browser.");
+            }
+        }
+
+        // HTML5 canvas drawing in case TomTom API credentials fail
+        function drawFallbackCanvas(route, current, dest) {
+            const canvas = document.getElementById("fallback-map-canvas");
+            const ctx = canvas.getContext("2d");
+            
+            // Adapt canvas boundaries
+            canvas.width = canvas.parentElement.clientWidth || 400;
+            canvas.height = canvas.parentElement.clientHeight || 300;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Slate background
+            ctx.fillStyle = "#0c0d12";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+            ctx.lineWidth = 1;
+            const gridSpacing = 40;
+            for (let x = 0; x < canvas.width; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            if (!route || route.length === 0) {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+                ctx.font = "14px Inter";
+                ctx.textAlign = "center";
+                ctx.fillText("Enter target destination and tap START", canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            // Compute coordinate boundaries to fit the route on canvas
+            let minLon = Infinity, maxLon = -Infinity;
+            let minLat = Infinity, maxLat = -Infinity;
+            
+            route.forEach(pt => {
+                if (pt[0] < minLon) minLon = pt[0];
+                if (pt[0] > maxLon) maxLon = pt[0];
+                if (pt[1] < minLat) minLat = pt[1];
+                if (pt[1] > maxLat) maxLat = pt[1];
+            });
+            
+            // Add padding bounds
+            const padding = 40;
+            const lonSpan = maxLon - minLon || 0.001;
+            const latSpan = maxLat - minLat || 0.001;
+            
+            function scaleX(lon) {
+                return padding + ((lon - minLon) / lonSpan) * (canvas.width - padding * 2);
+            }
+            function scaleY(lat) {
+                // Invert Y axis for canvas drawing
+                return canvas.height - (padding + ((lat - minLat) / latSpan) * (canvas.height - padding * 2));
+            }
+            
+            // Draw pedestrian route lines
+            ctx.strokeStyle = "rgba(59, 130, 246, 0.85)";
+            ctx.lineWidth = 5;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            
+            ctx.beginPath();
+            ctx.moveTo(scaleX(route[0][0]), scaleY(route[0][1]));
+            for (let i = 1; i < route.length; i++) {
+                ctx.lineTo(scaleX(route[i][0]), scaleY(route[i][1]));
+            }
+            ctx.stroke();
+            
+            // Draw Destination marker
+            if (dest) {
+                const dx = scaleX(dest[0]);
+                const dy = scaleY(dest[1]);
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath();
+                ctx.arc(dx, dy, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9px Inter";
+                ctx.fillText("DEST", dx - 10, dy - 12);
+            }
+            
+            // Draw user current position marker
+            if (current) {
+                const cx = scaleX(current[0]);
+                const cy = scaleY(current[1]);
+                
+                // Pulsing outer shadow circle
+                const pulseRadius = 14 + Math.sin(Date.now() / 150) * 3;
+                ctx.fillStyle = "rgba(59, 130, 246, 0.3)";
+                ctx.beginPath();
+                ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Core dot
+                ctx.fillStyle = "#3b82f6";
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        // ========================================================
+        // Fullscreen Toggle controller
+        // ========================================================
+        function toggleFullscreen(cardId) {
+            const card = document.getElementById(cardId);
+            const grid = document.getElementById("main-dashboard-grid");
+            
+            const isFullscreen = card.classList.contains("fullscreen-mode");
+            
+            // Reset all screen cards
+            const allCards = document.querySelectorAll(".screen-card");
+            allCards.forEach(c => {
+                c.classList.remove("fullscreen-mode");
+                c.classList.remove("grid-hidden");
+            });
+            
+            if (!isFullscreen) {
+                // Hide other cards, expand chosen card
+                card.classList.add("fullscreen-mode");
+                allCards.forEach(c => {
+                    if (c.id !== cardId) {
+                        c.classList.add("grid-hidden");
+                    }
+                });
+                
+                // Expand icon inside zoom-btn change
+                card.querySelector(".zoom-btn").innerHTML = `
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                    </svg>
+                `;
+            } else {
+                // Restore regular grid view
+                card.querySelector(".zoom-btn").innerHTML = `
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                `;
+            }
+            
+            // Adjust canvas sizing inside grids on zoom
+            setTimeout(() => {
+                if (!map && sessionActive) {
+                    const canvas = document.getElementById("fallback-map-canvas");
+                    if (!canvas.classList.contains("grid-hidden")) {
+                        // Repaint canvas mapping
+                        fetch('/api/state')
+                            .then(res => res.json())
+                            .then(state => {
+                                drawFallbackCanvas(state.route, state.current_position, state.dest_coords);
+                            });
+                    }
+                }
+                if (map) {
+                    map.invalidateSize();
+                }
+            }, 300);
+        }
+    </script>
+</body>
+</html>
