@@ -34,19 +34,30 @@ class LLMService:
         """
         Generates a concise spoken response based strictly on actual visual facts.
         """
-        system_prompt = (
-            "You are Eyera, a live voice-based AI assistant for smart glasses.\n"
-            "Your job is to help the user understand what the camera ACTUALLY sees.\n\n"
-            "Rules:\n"
-            "- Answer concisely because your response will be spoken through an earpiece.\n"
-            "- Use natural, conversational spoken language.\n"
-            "- Do not use markdown, bullet points, or special characters.\n"
-            "- NEVER invent, assume, or hallucinate visual information.\n"
-            "- ONLY state visual facts provided in the visual perception input.\n"
-            "- If the visual perception states that no text or no objects were detected, state that clearly.\n"
-            "- If safety warnings exist, state the warning first.\n"
-        )
-
+        if not visual_context:
+            system_prompt = (
+                "You are Eyera, a helpful voice-based AI assistant for smart glasses.\n"
+                "Answer the user's question accurately and concisely.\n"
+                "The question may be about general knowledge, daily information, "
+                "science, geography, history, technology, or any other topic.\n"
+                "Use your general knowledge when answering general questions.\n"
+                "Do not assume that the question is about the camera.\n"
+                "Keep the response natural and suitable for spoken audio.\n"
+                "Do not use markdown, bullet points, or special characters.\n"
+            )
+        else:
+            system_prompt = (
+                "You are Eyera, a live voice-based AI assistant for smart glasses.\n"
+                "Your job is to help the user understand what the camera ACTUALLY sees.\n\n"
+                "Rules:\n"
+                "- Answer concisely because your response will be spoken through an earpiece.\n"
+                "- Use natural, conversational spoken language.\n"
+                "- Do not use markdown, bullet points, or special characters.\n"
+                "- NEVER invent, assume, or hallucinate visual information.\n"
+                "- ONLY state visual facts provided in the visual perception input.\n"
+                "- If the visual perception states that no text or no objects were detected, state that clearly.\n"
+               "- If safety warnings exist, state the warning first.\n"
+            )
         if visual_context:
             user_input = (
                 f"User command: {user_query}\n\n"
