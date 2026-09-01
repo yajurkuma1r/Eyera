@@ -72,16 +72,18 @@ def run_live_vision_assistant():
             need_depth = reqs.get("need_depth", True)
             print(f"[FUSION] Required capability: {reqs.get('capability')}")
 
-            # 3b. Daily-life commands (time/date/day/festival) never touch
-            # the camera - answer instantly from the clock/calendar instead.
-            if command in fusion.NO_VISION_COMMANDS:
+            # 3b. Non-vision commands (time/date/day/festival/general knowledge/unknown)
+            # never touch the camera - answer directly from clock/calendar or LLM general knowledge.
+            if not need_ocr and not need_objects and not need_depth:
                 print("[FUSION] No camera required for this query.")
+                start_time = time.time()
                 response = assistant.process_live_query(
                     user_query=clean_query,
                     command=command,
                     speak=True
                 )
-                print(f"[LLM] Skipped (deterministic answer): \"{response.text}\"")
+                elapsed = time.time() - start_time
+                print(f"[ASSISTANT] Response ({elapsed:.2f}s): \"{response.text}\"")
                 print("[TTS] Generating speech...")
                 print("[TTS] Audio playback started\n")
                 continue

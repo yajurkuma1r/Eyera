@@ -11,7 +11,8 @@ class FusionService:
     """
 
     READING_COMMANDS = {
-        "READ_MENU", "READ_SIGN", "READ_TEXT", "READ_LABEL", "READ_MEDICINE", "CONTINUE_READING"
+        "READ_MENU", "READ_SIGN", "READ_TEXT", "READ_LABEL", "READ_MEDICINE",
+        "CONTINUE_READING", "READ_PRICE", "READ_EXPIRY", "READ_INGREDIENTS"
     }
 
     READING_KEYWORDS = {
@@ -22,7 +23,8 @@ class FusionService:
 
     OBJECT_COMMANDS = {
         "DESCRIBE_OBJECT", "DESCRIBE_SCENE", "GET_COLOR", "COUNT_PEOPLE",
-        "COUNT_OBJECTS", "CONFIRM_OBJECT", "WHERE_AM_I"
+        "COUNT_OBJECTS", "CONFIRM_OBJECT", "WHERE_AM_I", "FIND_OBJECT",
+        "START_NAVIGATION"
     }
 
     OBJECT_KEYWORDS = {
@@ -41,10 +43,17 @@ class FusionService:
         "close", "hit", "walk", "clear", "traffic", "vehicle"
     }
 
-    # Daily-life / general-knowledge commands that never need the camera.
-    # These are answered from the device clock / calendar, not from vision.
+    # Daily-life commands that never need the camera.
     NO_VISION_COMMANDS = {
         "GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL"
+    }
+
+    # Non-vision commands (daily-life, general knowledge, assistant control, unknown)
+    NON_VISION_COMMANDS = {
+        "GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL",
+        "GENERAL_QUERY", "WAKE_WORD", "CHECK_PRESENCE",
+        "REPEAT_LAST", "HELP", "STOP", "CANCEL", "STOP_READING",
+        "STOP_NAVIGATION", "UNKNOWN"
     }
 
     def __init__(self):
@@ -55,21 +64,52 @@ class FusionService:
         Determines which live vision models must be executed for this query.
         Returns a dict: {'need_ocr': bool, 'need_objects': bool, 'need_depth': bool, 'capability': str}
         """
-        cmd = command.upper() if command else ""
-        query_lower = user_query.lower()
+        cmd = command.upper().strip() if command else ""
+        query_lower = user_query.lower().strip()
+
+        # 0. Deterministic mapping when command is provided
+        if cmd:
+            if cmd in self.NON_VISION_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": False,
+                    "need_depth": False,
+                    "capability": "NONE"
+                }
+            if cmd in self.READING_COMMANDS:
+                return {
+                    "need_ocr": True,
+                    "need_objects": False,
+                    "need_depth": False,
+                    "capability": "OCR"
+                }
+            if cmd in self.SAFETY_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": True,
+                    "need_depth": True,
+                    "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
+                }
+            if cmd in self.OBJECT_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": True,
+                    "need_depth": True,
+                    "capability": "OBJECT_DETECTION, DEPTH"
+                }
+
+        # If no explicit command is provided, check query intent
+        # Vision intents have higher priority than general query
         words = set(re.findall(r"\b\w+\b", query_lower))
 
-        # 0. Daily-life / general info - no camera or vision model needed
-        if cmd in self.NO_VISION_COMMANDS:
-            return {
-                "need_ocr": False,
-                "need_objects": False,
-                "need_depth": False,
-                "capability": "NONE"
-            }
-
-        # 1. Reading request
-        if cmd in self.READING_COMMANDS or words.intersection(self.READING_KEYWORDS) or "what does" in query_lower:
+        # Check for reading requests
+        if (
+            any(w in words for w in ["menu", "sign", "label", "medicine", "ingredient", "ingredients", "nutrition", "price", "expiry"])
+            or query_lower.startswith("read")
+            or "what does this sign say" in query_lower
+            or "what does that sign say" in query_lower
+            or "what is written" in query_lower
+        ):
             return {
                 "need_ocr": True,
                 "need_objects": False,
@@ -77,8 +117,15 @@ class FusionService:
                 "capability": "OCR"
             }
 
-        # 2. Safety / Obstacle check
-        if cmd in self.SAFETY_COMMANDS or words.intersection(self.SAFETY_KEYWORDS) or "is it safe" in query_lower:
+        # Check for safety / obstacle requests
+        if (
+            "obstacle" in query_lower
+            or "is it safe" in query_lower
+            or "safe to walk" in query_lower
+            or "safe to cross" in query_lower
+            or "anything blocking" in query_lower
+            or "something blocking" in query_lower
+        ):
             return {
                 "need_ocr": False,
                 "need_objects": True,
@@ -86,8 +133,32 @@ class FusionService:
                 "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
             }
 
-        # 3. Object / Spatial / Room query
-        if cmd in self.OBJECT_COMMANDS or words.intersection(self.OBJECT_KEYWORDS) or "what is" in query_lower or "where" in query_lower:
+        # Check for object / spatial / scene requests
+        if (
+            "in front of me" in query_lower
+            or "around me" in query_lower
+            or "what do you see" in query_lower
+            or "describe the scene" in query_lower
+            or "describe my surroundings" in query_lower
+            or query_lower.startswith("where is the ")
+            or query_lower.startswith("where is my ")
+            or query_lower.startswith("where is a ")
+            or query_lower.startswith("where are the ")
+            or query_lower.startswith("find the ")
+            or query_lower.startswith("find my ")
+            or query_lower.startswith("locate the ")
+            or query_lower.startswith("locate my ")
+            or "what color is this" in query_lower
+            or "what colour is this" in query_lower
+            or query_lower == "what is this"
+            or query_lower == "what is that"
+            or "what am i looking at" in query_lower
+            or "what am i seeing" in query_lower
+            or query_lower.startswith("is this a ")
+            or query_lower.startswith("is that a ")
+            or query_lower.startswith("how many people")
+            or query_lower.startswith("how many objects")
+        ):
             return {
                 "need_ocr": False,
                 "need_objects": True,
@@ -95,26 +166,19 @@ class FusionService:
                 "capability": "OBJECT_DETECTION, DEPTH"
             }
 
-        # 4. General query - run full understanding
-            return {
-                "need_ocr": False,
-                "need_objects": False,
-                "need_depth": False,
-                "capability": "NONE"
-            }
-        # 5. Unknown / fallback - also do not activate camera
-            return {
-                "need_ocr": False,
-                "need_objects": False,
-                "need_depth": False,
-                "capability": "NONE"
-            }
+        # Default fallback for daily info, general knowledge questions, assistant controls, and unknown queries: NO CAMERA
+        return {
+            "need_ocr": False,
+            "need_objects": False,
+            "need_depth": False,
+            "capability": "NONE"
+        }
 
     def classify_intent(self, user_query: str, command: str = "") -> str:
         """
         Classifies the primary intent of the user's query.
         """
-        cmd = command.upper() if command else ""
+        cmd = command.upper().strip() if command else ""
         if cmd in self.NO_VISION_COMMANDS:
             return "DAILY_INFO"
         if cmd in self.READING_COMMANDS:
@@ -123,19 +187,34 @@ class FusionService:
             return "SAFETY"
         if cmd in self.OBJECT_COMMANDS:
             return "OBJECT_SEARCH"
+        if cmd in self.NON_VISION_COMMANDS:
+            return "GENERAL"
 
         query_lower = user_query.lower()
-        words = set(re.findall(r"\b\w+\b", query_lower))
-
-        if words.intersection(self.SAFETY_KEYWORDS) or "is it safe" in query_lower:
+        if (
+            "obstacle" in query_lower
+            or "is it safe" in query_lower
+            or "safe to walk" in query_lower
+        ):
             return "SAFETY"
-        if words.intersection(self.READING_KEYWORDS) or "what does it say" in query_lower or "what does this" in query_lower:
+        if (
+            "read" in query_lower
+            or "sign" in query_lower
+            or "menu" in query_lower
+            or "label" in query_lower
+            or "text" in query_lower
+            or "what does this sign say" in query_lower
+        ):
             return "READING"
-        if words.intersection(self.OBJECT_KEYWORDS) or "what do you see" in query_lower or "where" in query_lower:
+        if (
+            "in front of me" in query_lower
+            or "around me" in query_lower
+            or "where is" in query_lower
+            or "find " in query_lower
+            or "what do you see" in query_lower
+            or "what is this" in query_lower
+        ):
             return "OBJECT_SEARCH"
-
-        if cmd == "GENERAL_QUERY":
-            return "GENERAL"
 
         return "GENERAL"
 

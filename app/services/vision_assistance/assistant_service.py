@@ -6,6 +6,7 @@ from app.services.audio.tts_service import TTSService
 from app.services.vision_assistance.fusion_service import FusionService
 from app.services.vision_assistance.vision_service import VisionService
 from app.services.vision_assistance.camera_service import CameraService
+from app.services.vision_assistance.command_service import CommandService
 from app.services.vision_assistance.daily_info_service import DailyInfoService
 
 
@@ -29,6 +30,7 @@ class AssistantService:
         self.vision = VisionService()
         self.camera = CameraService()
         self.daily_info = DailyInfoService()
+        self.command_service = CommandService()
 
     def process(
         self,
@@ -70,10 +72,13 @@ class AssistantService:
         4. Fuses factual visual data into LLM prompt.
         5. Generates dynamic natural response and speaks it.
 
-        Daily-life commands (time / date / day / festival) are answered
-        directly from the device clock and calendar - the camera is
-        never activated for them, since they carry no visual content.
+        Daily-life commands (time / date / day / festival) and general
+        knowledge questions are answered without activating the camera.
         """
+        if not command:
+            command = self.command_service.process_command(user_query)
+
+        # Handle daily-life commands directly from clock / calendar (NO CAMERA)
         if command in self.fusion.NO_VISION_COMMANDS:
             response_text = self.daily_info.answer(command)
             response = AssistantResponse(
@@ -85,31 +90,42 @@ class AssistantService:
                 self.tts.speak(response.text)
             return response
 
+        # Handle UNKNOWN command with safe clarification (NO CAMERA)
+        if command == "UNKNOWN":
+            response = AssistantResponse(
+                text="I didn't quite catch that. Could you please rephrase your request?",
+                priority="NORMAL",
+                should_speak=speak
+            )
+            if response.should_speak:
+                self.tts.speak(response.text)
+            return response
+
         # Step 1: Determine required capabilities
         reqs = self.fusion.determine_requirements(command=command, user_query=user_query)
         need_ocr = reqs.get("need_ocr", False)
-        need_objects = reqs.get("need_objects", True)
-        need_depth = reqs.get("need_depth", True)
+        need_objects = reqs.get("need_objects", False)
+        need_depth = reqs.get("need_depth", False)
 
-        # Step 2: If no vision capability is required,
+        # Step 2: If no vision capability is required (e.g. GENERAL_QUERY),
         # answer directly using the LLM without activating the camera.
         if not need_ocr and not need_objects and not need_depth:
-           return self.process(
-               user_query=user_query,
-               visual_context="",
-               speak=speak
+            return self.process(
+                user_query=user_query,
+                visual_context="",
+                speak=speak
             )
 
         # Step 3: Capture live camera frame only when vision is required
         if frame is None:
-           frame = self.camera.get_current_frame()
+            frame = self.camera.get_current_frame()
 
         # Step 4: Run only the required vision models
         visual_data = self.vision.process_live_frame(
-           frame=frame,
-           need_ocr=need_ocr,
-           need_objects=need_objects,
-           need_depth=need_depth
+            frame=frame,
+            need_ocr=need_ocr,
+            need_objects=need_objects,
+            need_depth=need_depth
         )
 
         # Step 5: Fuse factual context

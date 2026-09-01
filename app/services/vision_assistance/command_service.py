@@ -157,13 +157,24 @@ class CommandService:
         # ============================================================
 
         if (
-           "where is my" in text
-           or "where can i find" in text
-           or "find my" in text
-           or "find the" in text
-           or "locate my" in text
-           or "locate the" in text
-           or "where can i see" in text
+            "where is my" in text
+            or "where is the" in text
+            or "where is a" in text
+            or "where is an" in text
+            or "where are my" in text
+            or "where are the" in text
+            or "where's my" in text
+            or "where's the" in text
+            or "where can i find" in text
+            or "find my" in text
+            or "find the" in text
+            or "find a" in text
+            or "find an" in text
+            or "locate my" in text
+            or "locate the" in text
+            or "locate a" in text
+            or "locate an" in text
+            or "where can i see" in text
         ):
             return "FIND_OBJECT"
 
@@ -337,28 +348,6 @@ class CommandService:
         ):
             return "GET_FESTIVAL"
         # ============================================================
-        # 18b. GENERAL KNOWLEDGE / NON-VISION QUESTIONS
-        # ============================================================
-
-        # Questions that do not require the camera are sent directly
-        # to the LLM for a general factual answer.
-
-        if (
-            text.startswith("who ")
-            or text.startswith("what ")
-            or text.startswith("when ")
-            or text.startswith("why ")
-            or text.startswith("how ")
-            or text.startswith("where ")
-            or text.startswith("which ")
-            or text.startswith("can you explain")
-            or text.startswith("explain ")
-            or text.startswith("tell me about")
-        ):
-            return "GENERAL_QUERY"
-    
-
-        # ============================================================
         # 19. ASSISTANT INTERACTION
         # ============================================================
 
@@ -405,4 +394,35 @@ class CommandService:
         ):
             return "CANCEL"
 
-        return "GENERAL_QUERY"
+        # ============================================================
+        # 20. GENERAL KNOWLEDGE / NON-VISION QUESTIONS
+        # ============================================================
+
+        # Questions that do not require the camera are sent directly
+        # to the LLM for a general factual answer.
+
+        if (
+            text.startswith("who ")
+            or text.startswith("who's ")
+            or text.startswith("what ")
+            or text.startswith("what's ")
+            or text.startswith("when ")
+            or text.startswith("why ")
+            or text.startswith("how ")
+            or text.startswith("where ")
+            or text.startswith("which ")
+            or text.startswith("whose ")
+            or text.startswith("whom ")
+            or text.startswith("can you explain")
+            or text.startswith("can you tell me")
+            or text.startswith("could you explain")
+            or text.startswith("could you tell me")
+            or text.startswith("explain ")
+            or text.startswith("tell me about")
+            or text.startswith("define ")
+            or text.startswith("meaning of ")
+            or text.endswith("?")
+        ):
+            return "GENERAL_QUERY"
+
+        return "UNKNOWN"
