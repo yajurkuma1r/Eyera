@@ -91,26 +91,35 @@ class AssistantService:
         need_objects = reqs.get("need_objects", True)
         need_depth = reqs.get("need_depth", True)
 
-        # Step 2: Capture live camera frame if not provided
-        if frame is None:
-            frame = self.camera.get_current_frame()
+        # Step 2: If no vision capability is required,
+        # answer directly using the LLM without activating the camera.
+        if not need_ocr and not need_objects and not need_depth:
+           return self.process(
+               user_query=user_query,
+               visual_context="",
+               speak=speak
+            )
 
-        # Step 3: Run vision models on live frame
+        # Step 3: Capture live camera frame only when vision is required
+        if frame is None:
+           frame = self.camera.get_current_frame()
+
+        # Step 4: Run only the required vision models
         visual_data = self.vision.process_live_frame(
-            frame=frame,
-            need_ocr=need_ocr,
-            need_objects=need_objects,
-            need_depth=need_depth
+           frame=frame,
+           need_ocr=need_ocr,
+           need_objects=need_objects,
+           need_depth=need_depth
         )
 
-        # Step 4: Fuse factual context
+        # Step 5: Fuse factual context
         visual_context = self.fusion.fuse(
             user_query=user_query,
             visual_data=visual_data,
             command=command
         )
 
-        # Step 5 & 6: LLM reasoning and speech
+        # Step 6 & 7: LLM reasoning and speech
         return self.process(
             user_query=user_query,
             visual_context=visual_context,
