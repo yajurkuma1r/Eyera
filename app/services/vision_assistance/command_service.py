@@ -196,7 +196,51 @@ class CommandService:
             return "CONFIRM_OBJECT"
 
         # ============================================================
-        # 11. ASSISTANT INTERACTION
+        # 11. DAILY LIFE / GENERAL INFORMATION (no camera required)
+        # ============================================================
+
+        if (
+            "what time is it" in text
+            or "what's the time" in text
+            or "what is the time" in text
+            or "current time" in text
+            or "tell me the time" in text
+        ):
+            return "GET_TIME"
+
+        if (
+            "what is the date" in text
+            or "what's the date" in text
+            or "today's date" in text
+            or "todays date" in text
+            or "what is today's date" in text
+            or "what's today's date" in text
+        ):
+            return "GET_DATE"
+
+        if (
+            "what day is it" in text
+            or "what day is today" in text
+            or "what's the day today" in text
+            or "which day is it" in text
+            or "which day is today" in text
+        ):
+            return "GET_DAY"
+
+        if (
+            "festival today" in text
+            or "any festival" in text
+            or "is today a festival" in text
+            or "is it a festival" in text
+            or "is today a holiday" in text
+            or "is it a holiday today" in text
+            or "what festival is today" in text
+            or "any holiday today" in text
+        ):
+            return "GET_FESTIVAL"
+
+        # ============================================================
+        # 12. ASSISTANT INTERACTION
         # ============================================================
 
         if (

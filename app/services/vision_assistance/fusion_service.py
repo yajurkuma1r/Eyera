@@ -41,6 +41,12 @@ class FusionService:
         "close", "hit", "walk", "clear", "traffic", "vehicle"
     }
 
+    # Daily-life / general-knowledge commands that never need the camera.
+    # These are answered from the device clock / calendar, not from vision.
+    NO_VISION_COMMANDS = {
+        "GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL"
+    }
+
     def __init__(self):
         pass
 
@@ -52,6 +58,15 @@ class FusionService:
         cmd = command.upper() if command else ""
         query_lower = user_query.lower()
         words = set(re.findall(r"\b\w+\b", query_lower))
+
+        # 0. Daily-life / general info - no camera or vision model needed
+        if cmd in self.NO_VISION_COMMANDS:
+            return {
+                "need_ocr": False,
+                "need_objects": False,
+                "need_depth": False,
+                "capability": "NONE"
+            }
 
         # 1. Reading request
         if cmd in self.READING_COMMANDS or words.intersection(self.READING_KEYWORDS) or "what does" in query_lower:
@@ -93,6 +108,8 @@ class FusionService:
         Classifies the primary intent of the user's query.
         """
         cmd = command.upper() if command else ""
+        if cmd in self.NO_VISION_COMMANDS:
+            return "DAILY_INFO"
         if cmd in self.READING_COMMANDS:
             return "READING"
         if cmd in self.SAFETY_COMMANDS:

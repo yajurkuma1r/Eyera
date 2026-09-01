@@ -42,6 +42,8 @@ def run_live_vision_assistant():
     print("  - 'Read the menu' / 'What does this sign say?'")
     print("  - 'What is in front of me?' / 'Where is the chair?'")
     print("  - 'Is it safe to cross?' / 'Describe my surroundings'")
+    print("  - 'What time is it?' / 'What's the date?' / 'What day is it?'")
+    print("  - 'Is there any festival today?'")
     print("  - Type 'exit' or 'quit' to stop\n")
 
     while True:
@@ -69,6 +71,20 @@ def run_live_vision_assistant():
             need_objects = reqs.get("need_objects", True)
             need_depth = reqs.get("need_depth", True)
             print(f"[FUSION] Required capability: {reqs.get('capability')}")
+
+            # 3b. Daily-life commands (time/date/day/festival) never touch
+            # the camera - answer instantly from the clock/calendar instead.
+            if command in fusion.NO_VISION_COMMANDS:
+                print("[FUSION] No camera required for this query.")
+                response = assistant.process_live_query(
+                    user_query=clean_query,
+                    command=command,
+                    speak=True
+                )
+                print(f"[LLM] Skipped (deterministic answer): \"{response.text}\"")
+                print("[TTS] Generating speech...")
+                print("[TTS] Audio playback started\n")
+                continue
 
             # 4. 📷 Live Camera: Capture CURRENT Camera Frame
             print("[CAMERA] Capturing current frame...")

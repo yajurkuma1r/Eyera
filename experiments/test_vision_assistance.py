@@ -18,6 +18,7 @@ from app.services.vision_assistance import (
     STTService,
     FusionService,
     LLMService,
+    DailyInfoService,
     AssistantService,
     VoiceController,
 )
@@ -113,6 +114,44 @@ def test_live_vision_processing():
     print("[PASS] Live factual vision processing verified.")
 
 
+def test_daily_info_commands():
+    print("\n--- Test 5: Daily-Life Commands (no camera required) ---")
+    cmd_svc = CommandService()
+    fusion = FusionService()
+    daily = DailyInfoService()
+
+    # Intent detection
+    assert cmd_svc.process_command("what time is it") == "GET_TIME"
+    assert cmd_svc.process_command("what's the date") == "GET_DATE"
+    assert cmd_svc.process_command("what day is it") == "GET_DAY"
+    assert cmd_svc.process_command("is there any festival today") == "GET_FESTIVAL"
+
+    # These must never request vision capabilities
+    for command in ["GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL"]:
+        reqs = fusion.determine_requirements(command=command, user_query="")
+        assert reqs["need_ocr"] is False
+        assert reqs["need_objects"] is False
+        assert reqs["need_depth"] is False
+        assert reqs["capability"] == "NONE"
+
+    # Answers are deterministic, from the real clock/calendar
+    assert "currently" in daily.answer("GET_TIME").lower()
+    assert "today is" in daily.answer("GET_DATE").lower()
+    assert "today is" in daily.answer("GET_DAY").lower()
+
+    # AssistantService should bypass the camera entirely for these
+    assistant = AssistantService(mock=True)
+    response = assistant.process_live_query(
+        user_query="What time is it?",
+        command="GET_TIME",
+        speak=False
+    )
+    print(f"Daily info (time) -> \"{response.text}\"")
+    assert "currently" in response.text.lower()
+
+    print("[PASS] Daily-life commands verified (camera never invoked).")
+
+
 def test_voice_controller_integration():
     print("\n--- Test 5: VoiceController Integration ---")
     vc = VoiceController()
@@ -131,6 +170,7 @@ if __name__ == "__main__":
     test_command_service()
     test_fusion_requirements()
     test_live_vision_processing()
+    test_daily_info_commands()
     test_voice_controller_integration()
     print("\n======================================================")
     print("  ALL VISION ASSISTANCE TESTS PASSED SUCCESSFULLY!    ")
