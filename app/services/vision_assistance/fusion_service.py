@@ -6,7 +6,7 @@ class FusionService:
     """
     Multimodal Fusion & Relevance Engine for Eyera Smart Glasses.
 
-    1. Determines required visual capabilities from user voice queries / commands.
+    1. Determines required visual capabilities based on user voice query and command.
     2. Fuses live factual vision and OCR detections into concise, factual context for the LLM.
     """
 
@@ -44,17 +44,17 @@ class FusionService:
     def __init__(self):
         pass
 
-    def determine_requirements(self, command: str = "", user_query: str = "") -> Dict[str, bool]:
+    def determine_requirements(self, command: str = "", user_query: str = "") -> Dict[str, Any]:
         """
         Determines which live vision models must be executed for this query.
-        Returns a dict: {'need_ocr': bool, 'need_objects': bool, 'need_depth': bool}
+        Returns a dict: {'need_ocr': bool, 'need_objects': bool, 'need_depth': bool, 'capability': str}
         """
         cmd = command.upper() if command else ""
         query_lower = user_query.lower()
         words = set(re.findall(r"\b\w+\b", query_lower))
 
         # 1. Reading request
-        if cmd in self.READING_COMMANDS or words.intersection(self.READING_KEYWORDS) or "what does this" in query_lower:
+        if cmd in self.READING_COMMANDS or words.intersection(self.READING_KEYWORDS) or "what does" in query_lower:
             return {
                 "need_ocr": True,
                 "need_objects": False,
@@ -68,16 +68,16 @@ class FusionService:
                 "need_ocr": False,
                 "need_objects": True,
                 "need_depth": True,
-                "capability": "YOLO + MiDaS + Safety"
+                "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
             }
 
         # 3. Object / Spatial / Room query
-        if cmd in self.OBJECT_COMMANDS or words.intersection(self.OBJECT_KEYWORDS) or "what is" in query_lower:
+        if cmd in self.OBJECT_COMMANDS or words.intersection(self.OBJECT_KEYWORDS) or "what is" in query_lower or "where" in query_lower:
             return {
                 "need_ocr": False,
                 "need_objects": True,
                 "need_depth": True,
-                "capability": "YOLO + MiDaS"
+                "capability": "OBJECT_DETECTION, DEPTH"
             }
 
         # 4. General query - run full understanding
@@ -85,7 +85,7 @@ class FusionService:
             "need_ocr": True,
             "need_objects": True,
             "need_depth": True,
-            "capability": "Full Vision Stack"
+            "capability": "OCR, OBJECT_DETECTION, DEPTH"
         }
 
     def classify_intent(self, user_query: str, command: str = "") -> str:
@@ -105,9 +105,9 @@ class FusionService:
 
         if words.intersection(self.SAFETY_KEYWORDS) or "is it safe" in query_lower:
             return "SAFETY"
-        if words.intersection(self.READING_KEYWORDS) or "what does it say" in query_lower:
+        if words.intersection(self.READING_KEYWORDS) or "what does it say" in query_lower or "what does this" in query_lower:
             return "READING"
-        if words.intersection(self.OBJECT_KEYWORDS) or "what do you see" in query_lower:
+        if words.intersection(self.OBJECT_KEYWORDS) or "what do you see" in query_lower or "where" in query_lower:
             return "OBJECT_SEARCH"
 
         return "GENERAL"
@@ -153,7 +153,7 @@ class FusionService:
         if ocr_text:
             return f"[Detected Text in Camera View]:\n\"{ocr_text}\""
         else:
-            return "[Detected Text in Camera View]: No readable text was found in the current camera frame."
+            return "[Detected Text in Camera View]: No readable text was detected in the current camera frame."
 
     def _format_object_context(self, data: Dict[str, Any]) -> str:
         context_parts = []
@@ -169,7 +169,7 @@ class FusionService:
                 obj_lines.append(f"- {label} ({pos}{dist_str})")
             context_parts.append("[Detected Objects & Spatial Positions]:\n" + "\n".join(obj_lines))
         else:
-            context_parts.append("[Detected Objects]: No specific objects detected in the current camera view.")
+            context_parts.append("[Detected Objects]: No notable objects detected in the current camera view.")
 
         warnings = data.get("warnings", [])
         if warnings:

@@ -21,10 +21,10 @@ class LLMService:
                 from openai import OpenAI
                 self.client = OpenAI(api_key=api_key)
             except Exception as e:
-                print(f"[LLMService] OpenAI init notice ({e}). Using live local response synthesizer.")
+                print(f"[LLM] OpenAI init notice ({e}). Using live local response synthesizer.")
                 self.client = None
         else:
-            print("[LLMService] Active in live response synthesizer mode.")
+            print("[LLM] Active in live response synthesizer mode.")
 
     def generate_response(
         self,
@@ -71,7 +71,7 @@ class LLMService:
                 )
                 return response.choices[0].message.content.strip()
             except Exception as e:
-                print(f"[LLMService] API call notice ({e}). Synthesizing from live visual facts.")
+                print(f"[LLM] API call notice ({e}). Synthesizing from live visual facts.")
                 return self._synthesize_live_response(user_query, visual_context)
 
         return self._synthesize_live_response(user_query, visual_context)
@@ -84,6 +84,8 @@ class LLMService:
         if not visual_context or "no visual perception" in visual_context.lower() or "camera frame unavailable" in visual_context.lower():
             return "I am unable to access the camera right now."
 
+        query_lower = user_query.lower()
+
         # 1. Critical Safety Warnings
         if "[CRITICAL SAFETY WARNINGS]" in visual_context:
             match = re.search(r"-\s*([^\n]+)", visual_context)
@@ -95,25 +97,40 @@ class LLMService:
             match = re.search(r'\[(?:Detected Text in Camera View|Visible Text)\]:\s*(?:No readable text|"([^"]+)")', visual_context)
             if match and match.group(1):
                 actual_text = match.group(1).strip()
-                # If short or single line
+                if "menu" in query_lower:
+                    return f"The menu has {actual_text}."
+                if "sign" in query_lower or "board" in query_lower:
+                    return f"The sign says {actual_text}."
                 return f"The text reads: {actual_text}."
             elif "no readable text" in visual_context.lower():
-                return "I couldn't detect any readable text in view."
+                return "I couldn't detect any readable text in the camera view."
 
-        # 3. Object / Spatial Detection
+        # 3. Specific Object query (e.g. "Where is the chair?", "Where is the door?")
+        target_obj = None
+        for word in ["chair", "door", "table", "person", "bottle", "cup", "car", "laptop", "cell phone"]:
+            if word in query_lower:
+                target_obj = word
+                break
+
+        if target_obj and "[Detected Objects & Spatial Positions]" in visual_context:
+            match = re.search(rf"-\s*({target_obj}[^\n]*)", visual_context, re.IGNORECASE)
+            if match:
+                return f"I see a {match.group(1).strip()}."
+            else:
+                return f"I don't see any {target_obj} in front of you."
+
+        # 4. General Object / Spatial Detection
         if "[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects]" in visual_context:
-            if "no specific objects" in visual_context.lower() or "no notable objects" in visual_context.lower():
-                return "I don't see any notable objects directly in front of you."
+            if "no notable objects" in visual_context.lower() or "no specific objects" in visual_context.lower():
+                return "I don't see any notable objects in front of you."
 
-            # Extract actual detected items
             items = re.findall(r"-\s*([^\n]+)", visual_context)
             if items:
                 items_str = ", ".join(items[:4])
                 return f"In front of you, I see {items_str}."
 
-        # General factual response
         cleaned_lines = [l.strip() for l in visual_context.splitlines() if l.strip() and not l.startswith("[")]
         if cleaned_lines:
             return f"I see {cleaned_lines[0]}."
 
-        return "I analyzed the current camera view, but didn't find any notable text or objects."
+        return "I analyzed the camera view, but didn't find any notable text or objects."

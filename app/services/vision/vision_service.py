@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pytesseract
 import torch
+from typing import Any, Dict, List, Optional
 from ultralytics import YOLO
 import supervision as sv
 
@@ -17,11 +18,11 @@ class VisionService:
 
     def __init__(
         self,
-        yolo_model_path="yolov8n.pt",
-        close_threshold=300.0,
-        very_close_threshold=500.0,
-        center_width_ratio=0.4,
-        tesseract_path=r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        yolo_model_path: str = "yolov8n.pt",
+        close_threshold: float = 300.0,
+        very_close_threshold: float = 500.0,
+        center_width_ratio: float = 0.4,
+        tesseract_path: Optional[str] = r"C:\Program Files\Tesseract-OCR\tesseract.exe",
     ):
         # Support callers passing tesseract_path positionally as first argument
         if isinstance(yolo_model_path, str) and ("tesseract" in yolo_model_path.lower() or yolo_model_path.endswith(".exe")):
@@ -32,26 +33,26 @@ class VisionService:
         self.close_threshold = close_threshold
         self.very_close_threshold = very_close_threshold
         self.center_width_ratio = center_width_ratio
-        self.tesseract_path = tesseract_path
+        self.tesseract_path = tesseract_path or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
         # Set up Tesseract
-        pytesseract.pytesseract.tesseract_cmd = self.tesseract_path
+        try:
+            pytesseract.pytesseract.tesseract_cmd = self.tesseract_path
+        except Exception:
+            pass
 
         # Load YOLO model
         print("[VisionService] Loading YOLO model...")
         self.yolo = YOLO(self.yolo_model_path)
 
-        # Load MiDaS model
-        print("[VisionService] Loading MiDaS model...")
-        self.midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small")
-        self.midas.eval()
-
-        transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-        self.transform = transforms.small_transform
-
-        # Initialize ByteTrack
+        # Load ByteTrack
         print("[VisionService] Loading ByteTrack...")
         self.tracker = sv.ByteTrack()
+
+        # Load MiDaS model
+        self.midas = None
+        self.transform = None
+        self._init_midas()
 
         # Initialize Approach Detector
         self.approach_detector = ApproachDetector()
@@ -78,7 +79,18 @@ class VisionService:
             "dining table": "Obstacle",
         }
 
-    def _get_position(self, center_x, frame_width):
+    def _init_midas(self):
+        try:
+            print("[VisionService] Loading MiDaS depth model...")
+            self.midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", verbose=False)
+            self.midas.eval()
+            transforms = torch.hub.load("intel-isl/MiDaS", "transforms", verbose=False)
+            self.transform = transforms.small_transform
+        except Exception as e:
+            print(f"[VisionService] MiDaS load notice ({e}). Using bounding box depth fallback.")
+            self.midas = None
+
+    def _get_position(self, center_x: float, frame_width: int) -> str:
         if center_x < frame_width / 3:
             return "left"
         elif center_x < (frame_width / 3) * 2:
@@ -86,92 +98,178 @@ class VisionService:
         else:
             return "right"
 
-    def _get_depth_label(self, depth_value):
+    def _get_depth_label(self, depth_value: float) -> str:
         if depth_value > 800:
-            return "near"
+            return "very close (< 1m)"
         elif depth_value > 400:
-            return "medium"
+            return "close (1m - 2m)"
         else:
-            return "far"
+            return "far (> 2m)"
 
-    def _get_depth_map(self, frame):
-        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        input_batch = self.transform(img_rgb)
-        with torch.no_grad():
-            prediction = self.midas(input_batch)
-            prediction = torch.nn.functional.interpolate(
-                prediction.unsqueeze(1),
-                size=img_rgb.shape[:2],
-                mode="bicubic",
-                align_corners=False,
-            ).squeeze()
-        return prediction.cpu().numpy()
+    def _get_depth_map(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        if self.midas is None or self.transform is None:
+            return None
+        try:
+            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            input_batch = self.transform(img_rgb)
+            with torch.no_grad():
+                prediction = self.midas(input_batch)
+                prediction = torch.nn.functional.interpolate(
+                    prediction.unsqueeze(1),
+                    size=img_rgb.shape[:2],
+                    mode="bicubic",
+                    align_corners=False,
+                ).squeeze()
+            return prediction.cpu().numpy()
+        except Exception:
+            return None
 
-    def get_scene_objects(self, frame):
+    def read_text(self, frame: np.ndarray) -> str:
         """
-        Takes a camera frame, returns a list of structured object dicts:
-        [{"id": int, "name": str, "position": str, "depth": str}, ...]
+        Extracts readable text from the live camera frame using OCR.
+        Applies preprocessing (grayscale, contrast threshold) and filters out OCR noise.
         """
+        if frame is None:
+            return ""
+
+        try:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Contrast enhancement
+            processed = cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            raw_text = pytesseract.image_to_string(processed)
+
+            # Clean lines
+            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+            cleaned_text = " ".join(lines)
+
+            # Noise rejection (too short or mostly symbols)
+            if len(cleaned_text) < 3:
+                # Try raw grayscale fallback
+                raw_text2 = pytesseract.image_to_string(gray)
+                lines2 = [line.strip() for line in raw_text2.split("\n") if line.strip()]
+                cleaned_text = " ".join(lines2)
+
+            if len(cleaned_text) < 3:
+                return ""
+
+            letter_count = sum(c.isalnum() for c in cleaned_text)
+            if letter_count / max(len(cleaned_text), 1) < 0.4:
+                return ""
+
+            return cleaned_text.strip()
+        except Exception as e:
+            # Fallback if tesseract binary is not configured
+            print(f"[VisionService] OCR runtime notice: {e}")
+            return ""
+
+    def get_scene_objects(self, frame: np.ndarray, need_depth: bool = True) -> List[Dict[str, Any]]:
+        """
+        Runs YOLO object detection and spatial depth calculation on live frame.
+        """
+        if frame is None:
+            return []
+
         frame_height, frame_width = frame.shape[:2]
-        depth_map = self._get_depth_map(frame)
+        depth_map = self._get_depth_map(frame) if need_depth else None
 
         result = self.yolo(frame, verbose=False)[0]
         detections = sv.Detections.from_ultralytics(result)
         detections = self.tracker.update_with_detections(detections)
 
         scene_objects = []
-        if detections.tracker_id is not None:
+        if detections.xyxy is not None and len(detections.xyxy) > 0:
             for i in range(len(detections.xyxy)):
+                conf = float(detections.confidence[i]) if detections.confidence is not None else 0.5
+                if conf < 0.35:
+                    continue
+
                 x1, y1, x2, y2 = detections.xyxy[i]
                 center_x = int((x1 + x2) / 2)
                 center_y = int((y1 + y2) / 2)
-                center_x_clamped = max(0, min(center_x, depth_map.shape[1] - 1))
-                center_y_clamped = max(0, min(center_y, depth_map.shape[0] - 1))
-                depth_value = depth_map[center_y_clamped, center_x_clamped]
-
-                track_id = detections.tracker_id[i]
                 class_id = int(detections.class_id[i])
                 object_name = self.yolo.names[class_id]
 
+                position = self._get_position(center_x, frame_width)
+
+                # Distance/depth calculation
+                if depth_map is not None:
+                    cy_clamped = max(0, min(center_y, depth_map.shape[0] - 1))
+                    cx_clamped = max(0, min(center_x, depth_map.shape[1] - 1))
+                    depth_val = float(depth_map[cy_clamped, cx_clamped])
+                    distance_str = self._get_depth_label(depth_val)
+                else:
+                    box_h_ratio = (y2 - y1) / frame_height
+                    if box_h_ratio > 0.5:
+                        distance_str = "very close (< 1m)"
+                    elif box_h_ratio > 0.25:
+                        distance_str = "close (1m - 2m)"
+                    else:
+                        distance_str = "far (> 2m)"
+
+                track_id = int(detections.tracker_id[i]) if detections.tracker_id is not None else i + 1
+
                 scene_objects.append({
-                    "id": int(track_id),
+                    "id": track_id,
+                    "label": object_name,
                     "name": object_name,
-                    "position": self._get_position(center_x, frame_width),
-                    "depth": self._get_depth_label(depth_value)
+                    "position": position,
+                    "distance": distance_str,
+                    "depth": distance_str,
+                    "confidence": round(conf, 2)
                 })
+
         return scene_objects
 
-    def read_text(self, frame):
+    def process_live_frame(
+        self,
+        frame: Optional[np.ndarray],
+        need_ocr: bool = False,
+        need_objects: bool = True,
+        need_depth: bool = True
+    ) -> Dict[str, Any]:
         """
-        Takes a camera frame, returns any text detected in it as a string.
-        Filters out OCR noise/garbage (short fragments, mostly symbols)
-        that comes from Tesseract misreading textures or busy backgrounds.
+        Selectively processes a live camera frame based on requested capabilities.
+        Returns structured factual visual data.
         """
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        raw_text = pytesseract.image_to_string(gray)
+        if frame is None:
+            return {
+                "text": "",
+                "objects": [],
+                "warnings": ["Camera frame unavailable"]
+            }
 
-        # Clean up: remove empty lines, join into one string
-        lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-        cleaned_text = " ".join(lines)
+        extracted_text = ""
+        if need_ocr:
+            extracted_text = self.read_text(frame)
 
-        # Reject obvious noise:
-        # - too short to be meaningful
-        # - mostly non-letter characters (symbols/garbage)
-        if len(cleaned_text) < 4:
-            return ""
+        detected_objects = []
+        if need_objects:
+            detected_objects = self.get_scene_objects(frame, need_depth=need_depth)
 
-        letter_count = sum(c.isalpha() for c in cleaned_text)
-        if letter_count / len(cleaned_text) < 0.5:
-            return ""
+        # Proximity warnings
+        warnings = []
+        for obj in detected_objects:
+            if "very close" in obj.get("distance", "").lower():
+                warnings.append({
+                    "type": "proximity",
+                    "object": obj.get("label", "Object"),
+                    "message": f"{obj.get('label', 'Obstacle')} is very close in {obj.get('position', 'front')}"
+                })
 
-        return cleaned_text
+        return {
+            "text": extracted_text,
+            "ocr_text": extracted_text,
+            "objects": detected_objects,
+            "detected_objects": detected_objects,
+            "warnings": warnings
+        }
 
-    def get_full_scene(self, frame, include_text=False):
+    def get_full_scene(self, frame: np.ndarray, include_text: bool = False) -> Dict[str, Any]:
         """
         Returns the combined structured output for one frame.
-        Set include_text=True only when text-reading is actually needed
-        (e.g. triggered by a READ_MENU command) - OCR is slow, so don't
-        run it on every frame.
+        Set include_text=True only when text-reading is actually needed.
         """
         return {
             "objects": self.get_scene_objects(frame),
@@ -180,7 +278,7 @@ class VisionService:
 
     def process_frame(self, frame):
         """
-        Processes a single camera frame.
+        Processes a single camera frame for navigation.
         Estimates depth, detects objects, tracks them, and evaluates warning conditions.
         Returns:
             annotated_frame: Frame with bounding boxes drawn.
@@ -189,19 +287,7 @@ class VisionService:
         # ==========================
         # MiDaS Depth Estimation
         # ==========================
-        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        input_batch = self.transform(img_rgb)
-
-        with torch.no_grad():
-            prediction = self.midas(input_batch)
-            prediction = torch.nn.functional.interpolate(
-                prediction.unsqueeze(1),
-                size=img_rgb.shape[:2],
-                mode="bicubic",
-                align_corners=False,
-            ).squeeze()
-
-        depth_map = prediction.cpu().numpy()
+        depth_map = self._get_depth_map(frame)
 
         # ==========================
         # YOLO Detection
@@ -217,7 +303,7 @@ class VisionService:
         warnings = []
 
         if detections.tracker_id is not None:
-            height, width = depth_map.shape[:2]
+            height, width = (depth_map.shape[:2] if depth_map is not None else frame.shape[:2])
             # Define walking path region (horizontal center region of the frame)
             left_bound = width * (0.5 - self.center_width_ratio / 2)
             right_bound = width * (0.5 + self.center_width_ratio / 2)
@@ -231,7 +317,7 @@ class VisionService:
                 center_x = max(0, min(center_x, width - 1))
                 center_y = max(0, min(center_y, height - 1))
 
-                depth_value = float(depth_map[center_y, center_x])
+                depth_value = float(depth_map[center_y, center_x]) if depth_map is not None else 0.0
                 track_id = int(detections.tracker_id[i])
                 class_id = int(detections.class_id[i])
                 object_name = self.yolo.names[class_id]

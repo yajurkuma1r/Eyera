@@ -1,112 +1,126 @@
 """
-Eyera AI Assistant + Vision Fusion Master Orchestrator
+Eyera Vision Assistance Live Runner
 
-Ties together:
-1. User Voice Command (STTService / Mic)
-2. Live Scene Perception (SceneCaptureService / OCR + YOLO)
-3. Multimodal Relevance Filtering (FusionService)
-4. LLM Scene Understanding (LLMService)
-5. Spoken Feedback (TTSService / Edge TTS)
+Live Vision Assistant Pipeline:
+1. User speaks -> Speech-to-Text
+2. Intent / Command Detection -> CommandService
+3. Fusion Layer -> Determines required visual capabilities
+4. Live Camera -> Captures CURRENT live webcam frame
+5. Vision Processing -> Selective YOLO / MiDaS / Tesseract OCR on live frame
+6. Structured Visual Output -> Factual observations (no hardcoding)
+7. Fusion Layer -> Formats factual visual context + original query
+8. LLM -> Generates dynamic natural response
+9. Edge TTS -> Audio output through earpiece
 """
 
 import sys
 import time
-from app.services.assistant.assistant_service import AssistantService
-from app.services.audio.stt_service import STTService
-from app.services.vision.scene_capture import SceneCaptureService
+from app.services.vision_assistance import (
+    AssistantService,
+    STTService,
+    CommandService,
+    CameraService,
+    FusionService,
+)
 
 
-def run_assistant_pipeline():
-    print("=" * 60)
-    print("      EYERA AI ASSISTANT + VISION FUSION RUNNER      ")
-    print("=" * 60)
+def run_live_vision_assistant():
+    print("=" * 65)
+    print("        EYERA LIVE VISION ASSISTANT RUNNER             ")
+    print("  (Speech/STT + Live Camera + YOLO/MiDaS/OCR + LLM)    ")
+    print("=" * 65)
 
-    # Initialize services
-    print("\n[Init] Initializing Assistant, Fusion, and Audio services...")
+    print("\n[Init] Initializing Live Vision Assistance Services...")
     assistant = AssistantService()
     stt = STTService()
-    scene_capture = SceneCaptureService()
+    command_service = CommandService()
+    camera = CameraService()
+    fusion = FusionService()
 
-    # Configuration defaults
-    current_preset = "menu"
-    use_live_camera = False
-
-    print("\n[Ready] Eyera Assistant Mode Active.")
-    print("Available Commands:")
-    print("  - Type or speak your query (e.g., 'Read the menu', 'What is in front of me?')")
-    print("  - 'preset <menu|street|office|bus>' to switch simulated camera scene")
-    print("  - 'camera' to toggle live webcam vs preset scenes")
-    print("  - 'exit' or 'quit' to stop\n")
+    print("\n[Ready] Eyera Live Vision Assistant Active.")
+    print("Speak or type any natural vision command:")
+    print("  - 'Read the menu' / 'What does this sign say?'")
+    print("  - 'What is in front of me?' / 'Where is the chair?'")
+    print("  - 'Is it safe to cross?' / 'Describe my surroundings'")
+    print("  - Type 'exit' or 'quit' to stop\n")
 
     while True:
         try:
-            print("-" * 60)
-            mode_indicator = "Live Camera" if use_live_camera else f"Preset: '{current_preset}'"
-            print(f"[Mode: {mode_indicator}]")
-
-            # 1. Capture Voice or Text Input
+            print("-" * 65)
+            # 1. 🎤 User Speaks -> Speech-to-Text
             query = stt.listen()
-
             if not query:
                 continue
 
             clean_query = query.strip()
             if clean_query.lower() in ("exit", "quit"):
-                print("[Eyera] Shutting down Assistant mode. Goodbye!")
+                print("[Eyera] Shutting down Live Vision Assistant. Goodbye!")
                 break
 
-            # Handle control commands
-            if clean_query.lower().startswith("preset "):
-                preset_name = clean_query.split(" ", 1)[1].strip()
-                if preset_name in scene_capture.list_presets():
-                    current_preset = preset_name
-                    use_live_camera = False
-                    print(f"[Eyera] Switched to scene preset: '{current_preset}'")
+            print(f"\n[STT] User command: {clean_query}")
+
+            # 2. 🎯 Intent / Command Detection
+            command = command_service.process_command(clean_query)
+            print(f"[COMMAND] Intent: {command}")
+
+            # 3. 🧠 Fusion Layer Determines Required Visual Capabilities
+            reqs = fusion.determine_requirements(command=command, user_query=clean_query)
+            need_ocr = reqs.get("need_ocr", False)
+            need_objects = reqs.get("need_objects", True)
+            need_depth = reqs.get("need_depth", True)
+            print(f"[FUSION] Required capability: {reqs.get('capability')}")
+
+            # 4. 📷 Live Camera: Capture CURRENT Camera Frame
+            print("[CAMERA] Capturing current frame...")
+            frame = camera.get_current_frame()
+            if frame is None:
+                print("[CAMERA] Notice: Live camera stream not accessible.")
+
+            # 5. 👁️ Vision Processing on LIVE Frame
+            if need_ocr:
+                print("[OCR] Processing frame...")
+            if need_objects:
+                print("[YOLO/MiDaS] Detecting objects and estimating depth...")
+
+            visual_data = assistant.vision.process_live_frame(
+                frame=frame,
+                need_ocr=need_ocr,
+                need_objects=need_objects,
+                need_depth=need_depth
+            )
+
+            if need_ocr:
+                detected_text = visual_data.get("text", "")
+                if detected_text:
+                    print(f"[OCR] Detected text: {detected_text}")
                 else:
-                    print(f"[Eyera] Unknown preset. Choose from: {scene_capture.list_presets()}")
-                continue
+                    print("[OCR] Detected text: [None]")
 
-            if clean_query.lower() == "camera":
-                use_live_camera = not use_live_camera
-                status = "Live Webcam" if use_live_camera else f"Preset: '{current_preset}'"
-                print(f"[Eyera] Camera mode toggled to: {status}")
-                continue
+            if need_objects:
+                objs = visual_data.get("objects", [])
+                if objs:
+                    obj_summary = [f"{o.get('label')} ({o.get('position')}, {o.get('distance')})" for o in objs]
+                    print(f"[YOLO/MiDaS] Objects detected: {obj_summary}")
+                else:
+                    print("[YOLO/MiDaS] Objects detected: [None]")
 
-            # 2. Capture Vision & OCR Perception Data
-            print("\n[Pipeline Step 1] Capturing visual perception...")
-            if use_live_camera:
-                visual_data = scene_capture.capture_live()
-            else:
-                visual_data = scene_capture.get_preset(current_preset)
+            # 6. 🔗 Fusion Layer: Send Factual Context to LLM
+            print("[FUSION] Sending visual context to LLM...")
+            visual_context = fusion.fuse(clean_query, visual_data, command=command)
 
-            print(f" -> Scene: {visual_data.get('scene_name', 'Unknown')}")
-            if visual_data.get("ocr_text"):
-                ocr_preview = visual_data["ocr_text"].replace('\n', ' ')[:80]
-                print(f" -> OCR Extracted: \"{ocr_preview}...\"")
-            if visual_data.get("detected_objects"):
-                print(f" -> Objects: {[o.get('label') for o in visual_data['detected_objects']]}")
-
-            # 3. Multimodal Fusion & Relevance Extraction
-            print("\n[Pipeline Step 2] Running Multimodal Fusion relevance filter...")
-            intent = assistant.fusion.classify_intent(clean_query)
-            filtered_context = assistant.fusion.fuse(clean_query, visual_data)
-            print(f" -> Detected Intent: {intent}")
-            print(f" -> Filtered Context Preview:\n{filtered_context}\n")
-
-            # 4. LLM Processing & Edge TTS Generation
-            print("[Pipeline Step 3] Generating spoken response via Assistant & LLM...")
+            # 7. 🤖 LLM Response Generation
             start_time = time.time()
-            response = assistant.process_with_fusion(
+            response = assistant.process(
                 user_query=clean_query,
-                raw_vision_data=visual_data,
+                visual_context=visual_context,
                 speak=True
             )
             elapsed = time.time() - start_time
+            print(f"[LLM] Response generated ({elapsed:.2f}s): \"{response.text}\"")
 
-            print("\n" + "=" * 40)
-            print(f"EYERA RESPONSE ({elapsed:.2f}s):")
-            print(f"\"{response.text}\"")
-            print("=" * 40 + "\n")
+            # 8. 🔊 Edge TTS Audio Output
+            print("[TTS] Generating speech...")
+            print("[TTS] Audio playback started\n")
 
         except KeyboardInterrupt:
             print("\n[Eyera] Session terminated by user.")
@@ -116,4 +130,4 @@ def run_assistant_pipeline():
 
 
 if __name__ == "__main__":
-    run_assistant_pipeline()
+    run_live_vision_assistant()
