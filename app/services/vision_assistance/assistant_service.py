@@ -1,16 +1,16 @@
 import numpy as np
 from typing import Any, Dict, Optional, Union
 from app.models.assistant_response import AssistantResponse
-from app.services.assistant.llm_service import LLMService
+from app.services.vision_assistance.llm_service import LLMService
 from app.services.audio.tts_service import TTSService
-from app.services.fusion.fusion_service import FusionService
-from app.services.vision.vision_service import VisionService
-from app.services.vision.camera_service import CameraService
+from app.services.vision_assistance.fusion_service import FusionService
+from app.services.vision_assistance.vision_service import VisionService
+from app.services.vision_assistance.camera_service import CameraService
 
 
 class AssistantService:
     """
-    Main Live AI Assistant Service for Eyera.
+    Main Live AI Assistant Service for Eyera (Vision Assistance Module).
 
     Coordinates:
     1. Intent-based vision capability determination (FusionService)

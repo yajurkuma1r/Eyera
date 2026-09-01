@@ -1,14 +1,14 @@
-from typing import Optional
+from typing import Optional, Tuple
 import numpy as np
-from app.services.audio.speech_service import SpeechService
-from app.services.audio.command_service import CommandService
+from app.services.vision_assistance.speech_service import SpeechService
+from app.services.vision_assistance.command_service import CommandService
 from app.services.audio.tts_service import TTSService
-from app.services.assistant.assistant_service import AssistantService
+from app.services.vision_assistance.assistant_service import AssistantService
 
 
 class VoiceController:
     """
-    Voice Controller for Eyera.
+    Voice Controller for Eyera Vision Assistance.
     Listens for user speech, detects intent via CommandService,
     and executes the live vision assistant pipeline.
     """
@@ -19,7 +19,7 @@ class VoiceController:
         self.tts_service = TTSService()
         self.assistant_service = assistant_service or AssistantService()
 
-    def listen_for_command(self) -> tuple[str, str]:
+    def listen_for_command(self) -> Tuple[str, str]:
         """
         Listens to the user's voice and extracts both transcribed text and command label.
         Returns: (raw_text, command_label)
