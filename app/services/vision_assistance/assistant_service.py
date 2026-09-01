@@ -6,6 +6,7 @@ from app.services.audio.tts_service import TTSService
 from app.services.vision_assistance.fusion_service import FusionService
 from app.services.vision_assistance.vision_service import VisionService
 from app.services.vision_assistance.camera_service import CameraService
+from app.services.vision_assistance.daily_info_service import DailyInfoService
 
 
 class AssistantService:
@@ -27,6 +28,7 @@ class AssistantService:
         self.fusion = FusionService()
         self.vision = VisionService()
         self.camera = CameraService()
+        self.daily_info = DailyInfoService()
 
     def process(
         self,
@@ -67,7 +69,22 @@ class AssistantService:
         3. Runs YOLO / MiDaS / OCR selectively on the live frame.
         4. Fuses factual visual data into LLM prompt.
         5. Generates dynamic natural response and speaks it.
+
+        Daily-life commands (time / date / day / festival) are answered
+        directly from the device clock and calendar - the camera is
+        never activated for them, since they carry no visual content.
         """
+        if command in self.fusion.NO_VISION_COMMANDS:
+            response_text = self.daily_info.answer(command)
+            response = AssistantResponse(
+                text=response_text,
+                priority="NORMAL",
+                should_speak=speak
+            )
+            if response.should_speak:
+                self.tts.speak(response.text)
+            return response
+
         # Step 1: Determine required capabilities
         reqs = self.fusion.determine_requirements(command=command, user_query=user_query)
         need_ocr = reqs.get("need_ocr", False)

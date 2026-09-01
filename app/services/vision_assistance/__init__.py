@@ -8,7 +8,7 @@ from app.services.vision_assistance.fusion_service import FusionService
 from app.services.vision_assistance.llm_service import LLMService
 from app.services.vision_assistance.assistant_service import AssistantService
 from app.services.vision_assistance.voice_controller import VoiceController
-
+from app.services.vision_assistance.daily_info_service import DailyInfoService
 __all__ = [
     "VisionService",
     "CameraService",
@@ -20,4 +20,5 @@ __all__ = [
     "LLMService",
     "AssistantService",
     "VoiceController",
+    "DailyInfoService",
 ]
