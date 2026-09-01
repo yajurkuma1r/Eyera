@@ -96,12 +96,19 @@ class FusionService:
             }
 
         # 4. General query - run full understanding
-        return {
-            "need_ocr": True,
-            "need_objects": True,
-            "need_depth": True,
-            "capability": "OCR, OBJECT_DETECTION, DEPTH"
-        }
+            return {
+                "need_ocr": False,
+                "need_objects": False,
+                "need_depth": False,
+                "capability": "NONE"
+            }
+        # 5. Unknown / fallback - also do not activate camera
+            return {
+                "need_ocr": False,
+                "need_objects": False,
+                "need_depth": False,
+                "capability": "NONE"
+            }
 
     def classify_intent(self, user_query: str, command: str = "") -> str:
         """
@@ -126,6 +133,9 @@ class FusionService:
             return "READING"
         if words.intersection(self.OBJECT_KEYWORDS) or "what do you see" in query_lower or "where" in query_lower:
             return "OBJECT_SEARCH"
+
+        if cmd == "GENERAL_QUERY":
+            return "GENERAL"
 
         return "GENERAL"
 
