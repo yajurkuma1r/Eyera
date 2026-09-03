@@ -28,9 +28,16 @@ class TTSService:
         try:
             asyncio.run(self._generate_and_play(message))
         except Exception as e:
-            # Do not fabricate success - log clearly if TTS fails.
-            print(f"[TTS] Failed to generate/play speech: {e}")
-            return
+            # Do not fabricate success - log clearly if TTS fails, try pyttsx3 offline fallback.
+            print(f"[TTS] Online generation/play failed: {e}. Trying offline pyttsx3 fallback.")
+            try:
+                import pyttsx3
+                engine = pyttsx3.init()
+                engine.say(message)
+                engine.runAndWait()
+            except Exception as fallback_err:
+                print(f"[TTS] Failed to generate/play speech with fallback: {fallback_err}")
+                return
 
         self.last_spoken[message] = current_time
 
@@ -54,7 +61,20 @@ class TTSService:
         system = platform.system()
         try:
             if system == "Windows":
-                os.startfile(path)
+                abs_path = os.path.abspath(path)
+                try:
+                    import ctypes
+                    winmm = ctypes.windll.winmm
+                    winmm.mciSendStringW("close eyera_tts", None, 0, 0)
+                    open_cmd = f'open "{abs_path}" type mpegvideo alias eyera_tts'
+                    if winmm.mciSendStringW(open_cmd, None, 0, 0) == 0:
+                        winmm.mciSendStringW("play eyera_tts wait", None, 0, 0)
+                        winmm.mciSendStringW("close eyera_tts", None, 0, 0)
+                        return
+                except Exception as mci_err:
+                    print(f"[TTS] winmm playback notice: {mci_err}")
+                os.startfile(abs_path)
+                time.sleep(2.0)
             elif system == "Darwin":
                 subprocess.run(["afplay", path], check=True)
             else:
@@ -68,3 +88,4 @@ class TTSService:
                 raise RuntimeError("No supported audio player found (tried mpg123, ffplay, aplay).")
         except Exception as e:
             print(f"[TTS] Audio playback error: {e}")
+            raise

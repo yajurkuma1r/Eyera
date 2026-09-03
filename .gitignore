@@ -1,4 +1,9 @@
+venv/
 .venv/
 __pycache__/
 *.pyc
 tts.mp3
+*.mp3
+.env
+*.pt
+

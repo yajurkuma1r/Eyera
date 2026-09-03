@@ -4,13 +4,14 @@ from app.services.vision_assistance.speech_service import SpeechService
 from app.services.vision_assistance.command_service import CommandService
 from app.services.audio.tts_service import TTSService
 from app.services.vision_assistance.assistant_service import AssistantService
+from app.services.vision_assistance.concurrency_manager import concurrency_controller
 
 
 class VoiceController:
     """
     Voice Controller for Eyera Vision Assistance.
     Listens for user speech, detects intent via CommandService,
-    and executes the live vision assistant pipeline.
+    and executes the live vision assistant pipeline under concurrency control.
     """
 
     def __init__(self, assistant_service: Optional[AssistantService] = None):
@@ -49,11 +50,24 @@ class VoiceController:
 
     def run_once(self, frame: Optional[np.ndarray] = None):
         """
-        Executes a single live voice-in -> vision -> assistant -> TTS cycle.
+        Executes a single live voice-in -> vision -> assistant -> TTS cycle
+        guarded by concurrency lock.
         """
-        text, command = self.listen_for_command()
-        if not text:
-            return "UNKNOWN", "No speech detected"
+        if concurrency_controller.is_busy:
+            return "BUSY", "Operation already in progress"
 
-        response_text = self.handle_command_live(text, command, frame=frame)
-        return command, response_text
+        try:
+            with concurrency_controller.acquire_operation("VOICE_PIPELINE"):
+                text, command = self.listen_for_command()
+                if not text:
+                    return "UNKNOWN", "No speech detected"
+
+                response_text = self.handle_command_live(text, command, frame=frame)
+                return command, response_text
+        except RuntimeError as e:
+            print(f"[VoiceController] Concurrency notice: {e}")
+            return "BUSY", str(e)
+        except Exception as e:
+            print(f"[VoiceController Error] {e}")
+            return "ERROR", str(e)
+

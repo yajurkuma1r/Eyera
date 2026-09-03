@@ -22,6 +22,7 @@ from app.services.vision_assistance import (
     CameraService,
     FusionService,
 )
+from app.services.vision_assistance.concurrency_manager import concurrency_controller
 
 
 def run_live_vision_assistant():
@@ -36,6 +37,7 @@ def run_live_vision_assistant():
     command_service = CommandService()
     camera = CameraService()
     fusion = FusionService()
+    concurrency_controller.enable_listening()
 
     print("\n[Ready] Eyera Live Vision Assistant Active.")
     print("Speak or type any natural vision command:")
@@ -49,10 +51,11 @@ def run_live_vision_assistant():
     while True:
         try:
             print("-" * 65)
-            # 1. 🎤 User Speaks -> Speech-to-Text
-            query = stt.listen()
-            if not query:
-                continue
+            with concurrency_controller.acquire_operation("CLI_PIPELINE"):
+                # 1. 🎤 User Speaks -> Speech-to-Text
+                query = stt.listen()
+                if not query:
+                    continue
 
             clean_query = query.strip()
             if clean_query.lower() in ("exit", "quit"):
