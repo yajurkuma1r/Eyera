@@ -8,9 +8,9 @@ import sys
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.services.fusion.fusion_service import FusionService
+from app.services.vision_assistance.fusion_service import FusionService
 from app.services.vision.scene_capture import ScenePreset, SceneCaptureService
-from app.services.assistant.assistant_service import AssistantService
+from app.services.vision_assistance.assistant_service import AssistantService
 
 
 def test_fusion_intent_classification():

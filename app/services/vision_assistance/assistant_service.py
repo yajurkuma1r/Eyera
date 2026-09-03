@@ -57,6 +57,20 @@ class AssistantService:
 
         return response
 
+    def process_with_fusion(
+        self,
+        user_query: str,
+        raw_vision_data: Optional[Union[Dict[str, Any], str]] = None,
+        visual_context: str = "",
+        speak: bool = True
+    ) -> AssistantResponse:
+        """
+        Fuses visual perception data (if provided) and generates an AssistantResponse.
+        """
+        if raw_vision_data is not None and not visual_context:
+            visual_context = self.fusion.fuse(user_query=user_query, visual_data=raw_vision_data)
+        return self.process(user_query=user_query, visual_context=visual_context, speak=speak)
+
     def process_live_query(
         self,
         user_query: str,

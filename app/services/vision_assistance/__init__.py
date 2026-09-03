@@ -9,6 +9,12 @@ from app.services.vision_assistance.llm_service import LLMService
 from app.services.vision_assistance.assistant_service import AssistantService
 from app.services.vision_assistance.voice_controller import VoiceController
 from app.services.vision_assistance.daily_info_service import DailyInfoService
+from app.services.vision_assistance.concurrency_manager import (
+    ConcurrencyController,
+    concurrency_controller,
+)
+from app.services.vision_assistance.server import start_server
+
 __all__ = [
     "VisionService",
     "CameraService",
@@ -21,4 +27,7 @@ __all__ = [
     "AssistantService",
     "VoiceController",
     "DailyInfoService",
+    "ConcurrencyController",
+    "concurrency_controller",
+    "start_server",
 ]

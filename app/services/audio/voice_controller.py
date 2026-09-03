@@ -3,7 +3,7 @@ import numpy as np
 from app.services.audio.speech_service import SpeechService
 from app.services.audio.command_service import CommandService
 from app.services.audio.tts_service import TTSService
-from app.services.assistant.assistant_service import AssistantService
+from app.services.vision_assistance.assistant_service import AssistantService
 
 
 class VoiceController:

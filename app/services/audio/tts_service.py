@@ -173,12 +173,24 @@ class TTSService:
             speaker.Speak(message)
             return True
         except Exception as e:
-            print(f"[TTS Fallback Error] SAPI failed: {e}")
-            self._play_audio(filename)
-            word_count = len(message.split())
-            duration = max(1.5, word_count * 0.45 + 0.8)
-            time.sleep(duration)
-            return False
+            print(f"[TTS Fallback Error] SAPI failed: {e}. Trying pyttsx3.")
+            try:
+                import pyttsx3
+                engine = pyttsx3.init()
+                engine.say(message)
+                engine.runAndWait()
+                return True
+            except Exception as pyttsx_err:
+                print(f"[TTS Fallback Error] pyttsx3 failed: {pyttsx_err}. Trying file playback.")
+                try:
+                    self._play_audio(filename)
+                    word_count = len(message.split())
+                    duration = max(1.5, word_count * 0.45 + 0.8)
+                    time.sleep(duration)
+                    return True
+                except Exception as final_err:
+                    print(f"[TTS Fallback Error] All playback failed: {final_err}")
+                    return False
 
     def _play_audio(self, path):
         """
@@ -189,7 +201,20 @@ class TTSService:
         system = platform.system()
         try:
             if system == "Windows":
-                os.startfile(path)
+                abs_path = os.path.abspath(path)
+                try:
+                    import ctypes
+                    winmm = ctypes.windll.winmm
+                    winmm.mciSendStringW("close eyera_tts", None, 0, 0)
+                    open_cmd = f'open "{abs_path}" type mpegvideo alias eyera_tts'
+                    if winmm.mciSendStringW(open_cmd, None, 0, 0) == 0:
+                        winmm.mciSendStringW("play eyera_tts wait", None, 0, 0)
+                        winmm.mciSendStringW("close eyera_tts", None, 0, 0)
+                        return
+                except Exception as mci_err:
+                    print(f"[TTS] winmm playback notice: {mci_err}")
+                os.startfile(abs_path)
+                time.sleep(2.0)
             elif system == "Darwin":
                 subprocess.run(["afplay", path], check=True)
             else:
@@ -203,3 +228,4 @@ class TTSService:
                 raise RuntimeError("No supported audio player found (tried mpg123, ffplay, aplay).")
         except Exception as e:
             print(f"[TTS] Audio playback error: {e}")
+            raise

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Eyera Vision Assistant</title>
+</head>
+<body>
+    <h1>Eyera Vision Assistant Control</h1>
+    <p>Listening Status: <strong id="statusText">Disabled</strong></p>
+    <p>Pipeline Status: <strong id="pipelineText">Idle</strong></p>
+    
+    <button id="enableListenBtn" onclick="toggleListening()">Enable Listen</button>
+
+    <script>
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                const btn = document.getElementById('enableListenBtn');
+                const statusText = document.getElementById('statusText');
+                const pipelineText = document.getElementById('pipelineText');
+
+                if (data.listening_enabled) {
+                    btn.textContent = "Disable Listen";
+                    statusText.textContent = "Enabled (Active)";
+                } else {
+                    btn.textContent = "Enable Listen";
+                    statusText.textContent = "Disabled";
+                }
+
+                if (data.is_busy) {
+                    pipelineText.textContent = "Busy (Processing / Speaking)";
+                } else {
+                    pipelineText.textContent = "Idle";
+                }
+            } catch (err) {
+                console.error("Error fetching status:", err);
+            }
+        }
+
+        async function toggleListening() {
+            try {
+                const response = await fetch('/api/enable-listen', { method: 'POST' });
+                const data = await response.json();
+                updateStatus();
+            } catch (err) {
+                console.error("Error toggling listening:", err);
+            }
+        }
+
+        setInterval(updateStatus, 1000);
+        updateStatus();
+    </script>
+</body>
+</html>
