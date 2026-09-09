@@ -19,7 +19,7 @@ class AssistantService:
     2. Live camera frame capture (CameraService)
     3. Selective Vision & OCR perception (VisionService)
     4. Multimodal context fusion (FusionService)
-    5. Factual LLM reasoning (LLMService)
+    5. Factual LLM reasoning with live frame support (LLMService)
     6. Real-time spoken output (TTSService)
     """
 
@@ -36,14 +36,16 @@ class AssistantService:
         self,
         user_query: str,
         visual_context: str = "",
+        frame: Optional[np.ndarray] = None,
         speak: bool = True
     ) -> AssistantResponse:
         """
-        Processes a query with an already formatted visual context string.
+        Processes a query with an already formatted visual context string and optional camera frame.
         """
         response_text = self.llm.generate_response(
             user_query=user_query,
-            visual_context=visual_context
+            visual_context=visual_context,
+            frame=frame
         )
 
         response = AssistantResponse(
@@ -62,6 +64,7 @@ class AssistantService:
         user_query: str,
         raw_vision_data: Optional[Union[Dict[str, Any], str]] = None,
         visual_context: str = "",
+        frame: Optional[np.ndarray] = None,
         speak: bool = True
     ) -> AssistantResponse:
         """
@@ -69,7 +72,7 @@ class AssistantService:
         """
         if raw_vision_data is not None and not visual_context:
             visual_context = self.fusion.fuse(user_query=user_query, visual_data=raw_vision_data)
-        return self.process(user_query=user_query, visual_context=visual_context, speak=speak)
+        return self.process(user_query=user_query, visual_context=visual_context, frame=frame, speak=speak)
 
     def process_live_query(
         self,
@@ -127,6 +130,7 @@ class AssistantService:
             return self.process(
                 user_query=user_query,
                 visual_context="",
+                frame=None,
                 speak=speak
             )
 
@@ -149,10 +153,11 @@ class AssistantService:
             command=command
         )
 
-        # Step 6 & 7: LLM reasoning and speech
+        # Step 6 & 7: LLM reasoning and speech (with live frame passed to vision LLM)
         return self.process(
             user_query=user_query,
             visual_context=visual_context,
+            frame=frame,
             speak=speak
         )
 

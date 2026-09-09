@@ -134,6 +134,7 @@ def run_live_vision_assistant():
             response = assistant.process(
                 user_query=clean_query,
                 visual_context=visual_context,
+                frame=frame,
                 speak=True
             )
             elapsed = time.time() - start_time

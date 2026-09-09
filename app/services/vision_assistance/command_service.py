@@ -89,6 +89,8 @@ class CommandService:
             or "read this page" in text
             or "read this document" in text
             or "read this text" in text
+            or "read the text" in text
+            or "read text" in text
             or "read this" in text
             or text == "read"
         ):
@@ -138,17 +140,40 @@ class CommandService:
             return "READ_INGREDIENTS"
 
         # ============================================================
-        # 9. OBJECT IDENTIFICATION
+        # 9. OBJECT IDENTIFICATION / VISUAL QUESTIONS
         # ============================================================
 
         if (
             "what is this" in text
+            or "what is that" in text
+            or "what's this" in text
+            or "what's that" in text
             or "what is it" in text
             or "identify this" in text
             or "identify that" in text
             or "describe this object" in text
+            or "describe that object" in text
+            or "what does this object look like" in text
+            or "what does that object look like" in text
+            or "what does this look like" in text
+            or "what does that look like" in text
             or "what am i looking at" in text
             or "what am i seeing" in text
+            or "what am i holding" in text
+            or "what am i touching" in text
+            or "what is in my hand" in text
+            or "what's in my hand" in text
+            or "what brand is this" in text
+            or "what brand is that" in text
+            or "what brand is" in text
+            or "what shape is this" in text
+            or "what shape is that" in text
+            or "what shape is" in text
+            or "what material is this" in text
+            or "what material does this appear" in text
+            or "what material is" in text
+            or "what is this made of" in text
+            or "what is that made of" in text
         ):
             return "DESCRIBE_OBJECT"
 
@@ -243,10 +268,18 @@ class CommandService:
         if (
             "what color is this" in text
             or "what colour is this" in text
+            or "what color is" in text
+            or "what colour is" in text
+            or "what color it is" in text
+            or "what colour it is" in text
             or "what color is it" in text
             or "what colour is it" in text
             or "what is the color" in text
             or "what is the colour" in text
+            or "what's the color" in text
+            or "what's the colour" in text
+            or "which color is" in text
+            or "which colour is" in text
         ):
             return "GET_COLOR"
 
@@ -279,12 +312,14 @@ class CommandService:
         # ============================================================
 
         if (
-            "is this a chair" in text
-            or "is this a car" in text
-            or "is this a person" in text
-            or "is this a table" in text
-            or "is this a bottle" in text
-            or "is this a door" in text
+            text.startswith("is this a ")
+            or text.startswith("is this an ")
+            or text.startswith("is that a ")
+            or text.startswith("is that an ")
+            or "is this a " in text
+            or "is this an " in text
+            or "is that a " in text
+            or "is that an " in text
         ):
             return "CONFIRM_OBJECT"
 
@@ -347,6 +382,7 @@ class CommandService:
             or "is there a holiday today" in text
         ):
             return "GET_FESTIVAL"
+
         # ============================================================
         # 19. ASSISTANT INTERACTION
         # ============================================================

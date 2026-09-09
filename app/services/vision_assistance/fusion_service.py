@@ -31,7 +31,8 @@ class FusionService:
         "where", "find", "is there", "what is", "look like", "see",
         "chair", "table", "door", "bottle", "cup", "person", "car",
         "obstacle", "around", "front", "left", "right", "behind",
-        "describe", "surroundings", "room", "item", "items"
+        "describe", "surroundings", "room", "item", "items",
+        "holding", "color", "colour", "brand", "shape", "material"
     }
 
     SAFETY_COMMANDS = {
@@ -109,6 +110,7 @@ class FusionService:
             or "what does this sign say" in query_lower
             or "what does that sign say" in query_lower
             or "what is written" in query_lower
+            or "read the text" in query_lower
         ):
             return {
                 "need_ocr": True,
@@ -133,7 +135,7 @@ class FusionService:
                 "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
             }
 
-        # Check for object / spatial / scene requests
+        # Check for object / spatial / scene / visual understanding requests
         if (
             "in front of me" in query_lower
             or "around me" in query_lower
@@ -148,14 +150,25 @@ class FusionService:
             or query_lower.startswith("find my ")
             or query_lower.startswith("locate the ")
             or query_lower.startswith("locate my ")
-            or "what color is this" in query_lower
-            or "what colour is this" in query_lower
+            or "what color" in query_lower
+            or "what colour" in query_lower
             or query_lower == "what is this"
             or query_lower == "what is that"
             or "what am i looking at" in query_lower
             or "what am i seeing" in query_lower
+            or "what am i holding" in query_lower
+            or "what does this look like" in query_lower
+            or "what does that look like" in query_lower
+            or "what does this object look like" in query_lower
+            or "what brand is" in query_lower
+            or "what shape" in query_lower
+            or "what material" in query_lower
+            or "what is this made of" in query_lower
+            or "describe this object" in query_lower
             or query_lower.startswith("is this a ")
+            or query_lower.startswith("is this an ")
             or query_lower.startswith("is that a ")
+            or query_lower.startswith("is that an ")
             or query_lower.startswith("how many people")
             or query_lower.startswith("how many objects")
         ):
@@ -213,6 +226,9 @@ class FusionService:
             or "find " in query_lower
             or "what do you see" in query_lower
             or "what is this" in query_lower
+            or "what am i holding" in query_lower
+            or "what color" in query_lower
+            or "what colour" in query_lower
         ):
             return "OBJECT_SEARCH"
 

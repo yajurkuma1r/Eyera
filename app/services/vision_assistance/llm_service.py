@@ -1,94 +1,183 @@
+import base64
 import os
 import re
-from typing import Optional
+from typing import Optional, Union
+import cv2
+import numpy as np
+
+
+def _load_env_file():
+    """Automatically loads .env from project root if present."""
+    possible_paths = [
+        os.path.join(os.getcwd(), ".env"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env")),
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k and not os.environ.get(k):
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+
+def _encode_frame_to_base64(frame: np.ndarray) -> Optional[str]:
+    """
+    Encodes an OpenCV BGR numpy frame into a JPEG base64 string for multimodal LLMs.
+    """
+    try:
+        if frame is None or not isinstance(frame, np.ndarray):
+            return None
+        h, w = frame.shape[:2]
+        max_dim = 1024
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if ret:
+            return base64.b64encode(buffer).decode('utf-8')
+    except Exception as e:
+        print(f"[LLM] Notice: Frame encoding error ({e})")
+    return None
 
 
 class LLMService:
     """
     LLM reasoning service for Eyera Smart Glasses.
-    Interprets live visual perception data and generates concise, factual,
-    natural spoken responses.
+    Interprets live visual perception data and camera frames to generate concise, factual,
+    natural spoken responses. Supports Gemini and OpenAI multimodal vision models.
     """
 
     def __init__(self, model: str = "gpt-4o-mini", mock: bool = False):
-        self.model = model
+        _load_env_file()
         self.mock = mock or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes")
         self.client = None
+        self.model = model
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key and not self.mock:
+        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        if gemini_key and not self.mock:
             try:
                 from openai import OpenAI
-                self.client = OpenAI(api_key=api_key)
+                self.client = OpenAI(
+                    api_key=gemini_key,
+                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+                )
+                self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                print(f"[LLM] Multimodal Vision LLM active via Gemini ({self.model}). Real camera frames will be analyzed.")
+            except Exception as e:
+                print(f"[LLM] Gemini init notice ({e}). Using live local response synthesizer.")
+                self.client = None
+        elif openai_key and not self.mock:
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(api_key=openai_key)
+                self.model = model
+                print(f"[LLM] Multimodal Vision LLM active via OpenAI ({self.model}). Real camera frames will be analyzed.")
             except Exception as e:
                 print(f"[LLM] OpenAI init notice ({e}). Using live local response synthesizer.")
                 self.client = None
         else:
-            print("[LLM] Active in live response synthesizer mode.")
+            print("[LLM] Notice: Neither GEMINI_API_KEY nor OPENAI_API_KEY is set. Operating in offline rule synthesizer fallback.")
 
     def generate_response(
         self,
         user_query: str,
-        visual_context: str = ""
+        visual_context: str = "",
+        frame: Optional[np.ndarray] = None
     ) -> str:
         """
-        Generates a concise spoken response based strictly on actual visual facts.
+        Generates a concise spoken response based strictly on actual visual facts and/or camera frame.
         """
-        if not visual_context:
+        has_vision = bool(visual_context or frame is not None)
+
+        if not has_vision:
             system_prompt = (
                 "You are Eyera, a helpful voice-based AI assistant for smart glasses.\n"
-                "Answer the user's question accurately and concisely.\n"
+                "Answer the user's question accurately and concisely in 1 to 3 natural spoken sentences.\n"
                 "The question may be about general knowledge, daily information, "
                 "science, geography, history, technology, or any other topic.\n"
                 "Use your general knowledge when answering general questions.\n"
                 "Do not assume that the question is about the camera.\n"
                 "Keep the response natural and suitable for spoken audio.\n"
-                "Do not use markdown, bullet points, or special characters.\n"
+                "Do not use markdown, bullet points, asterisks, bolding, or special characters.\n"
             )
         else:
             system_prompt = (
                 "You are Eyera, a live voice-based AI assistant for smart glasses.\n"
-                "Your job is to help the user understand what the camera ACTUALLY sees.\n\n"
+                "Your job is to help the user understand what the camera ACTUALLY sees in 1 to 3 concise spoken sentences.\n\n"
                 "Rules:\n"
                 "- Answer concisely because your response will be spoken through an earpiece.\n"
                 "- Use natural, conversational spoken language.\n"
-                "- Do not use markdown, bullet points, or special characters.\n"
-                "- NEVER invent, assume, or hallucinate visual information.\n"
-                "- ONLY state visual facts provided in the visual perception input.\n"
-                "- If the visual perception states that no text or no objects were detected, state that clearly.\n"
-               "- If safety warnings exist, state the warning first.\n"
+                "- Do not use markdown, bullet points, asterisks, bolding, or special characters.\n"
+                "- When an image is provided, examine the actual visual details (such as color, shape, objects, visible branding, appearance, materials, or what the user is holding/looking at) to answer the user's question directly and factually.\n"
+                "- NEVER invent, assume, or hallucinate visual information. If something cannot be determined clearly from the image, state that you cannot determine it clearly.\n"
+                "- If safety warnings exist, state the warning first.\n"
             )
-        if visual_context:
-            user_input = (
-                f"User command: {user_query}\n\n"
-                f"Current visual observation from camera:\n{visual_context}\n\n"
-                f"Answer the user's command using only the above factual visual observations."
-            )
-        else:
-            user_input = (
-                f"User question: {user_query}\n\n"
-                f"Please answer the question concisely and accurately in a natural conversational tone."
-            )
+
+        base64_image = _encode_frame_to_base64(frame) if frame is not None else None
 
         if self.client and not self.mock:
             try:
+                if base64_image:
+                    context_snippet = f"\n\nPerception observations:\n{visual_context}" if visual_context else ""
+                    user_content = [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"User question/command: {user_query}"
+                                f"{context_snippet}\n\n"
+                                "Please analyze the provided camera image and answer the user factually and concisely in 1-2 spoken sentences."
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                                "detail": "auto"
+                            }
+                        }
+                    ]
+                elif visual_context:
+                    user_content = (
+                        f"User command: {user_query}\n\n"
+                        f"Current visual observation from camera:\n{visual_context}\n\n"
+                        f"Answer the user's command concisely using only the above factual visual observations."
+                    )
+                else:
+                    user_content = (
+                        f"User question: {user_query}\n\n"
+                        f"Please answer the question concisely and accurately in 1 to 3 natural conversational spoken sentences."
+                    )
+
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_input}
+                        {"role": "user", "content": user_content}
                     ],
-                    max_tokens=150
+                    max_tokens=1000
                 )
-                return response.choices[0].message.content.strip()
+                raw_text = response.choices[0].message.content.strip()
+                # Clean up any markdown bold/asterisks for smooth TTS playback
+                cleaned_text = re.sub(r"\*+", "", raw_text)
+                return cleaned_text.strip()
             except Exception as e:
                 print(f"[LLM] API call notice ({e}). Using local response synthesizer.")
-                if visual_context:
+                if has_vision:
                     return self._synthesize_vision_response(user_query, visual_context)
                 else:
                     return self._synthesize_general_response(user_query)
 
-        if visual_context:
+        if has_vision:
             return self._synthesize_vision_response(user_query, visual_context)
         else:
             return self._synthesize_general_response(user_query)
@@ -187,14 +276,14 @@ class LLMService:
             elif "no readable text" in visual_context.lower():
                 return "I couldn't detect any readable text in the camera view."
 
-        # 3. Specific Object query (e.g. "Where is the chair?", "Where is the door?")
+        # 3. Specific Object query (e.g. "Where is the chair?", "Where is the door?", "What color is the bottle?")
         target_obj = None
-        for word in ["chair", "door", "table", "person", "bottle", "cup", "car", "laptop", "cell phone"]:
+        for word in ["chair", "door", "table", "person", "bottle", "cup", "car", "laptop", "cell phone", "phone", "book", "box", "bag"]:
             if word in query_lower:
                 target_obj = word
                 break
 
-        if target_obj and "[Detected Objects & Spatial Positions]" in visual_context:
+        if target_obj and ("[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects]" in visual_context):
             match = re.search(rf"-\s*({target_obj}[^\n]*)", visual_context, re.IGNORECASE)
             if match:
                 return f"I see a {match.group(1).strip()}."
