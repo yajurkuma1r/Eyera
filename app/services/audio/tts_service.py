@@ -154,11 +154,29 @@ class TTSService:
             with self.lock:
                 self.active_player = player
                 
-            # Wait for playback to transition and start playing
-            time.sleep(0.3)
+            # Wait for playback to transition and start playing (pumping COM messages)
+            started = False
+            start_deadline = time.time() + 4.0
+            while time.time() < start_deadline:
+                pythoncom.PumpWaitingMessages()
+                if player.playState == 3:  # 3 = Playing
+                    started = True
+                    break
+                time.sleep(0.05)
+
+            if not started:
+                try:
+                    player.controls.stop()
+                except Exception:
+                    pass
+                return False
+
+            # Wait while playback is active with a safety timeout
             # playState: 3 = playing, 9 = transitioning, 2 = paused, 1 = stopped, 8 = ended
-            while player.playState in [3, 9]:
-                time.sleep(0.1)
+            playback_deadline = time.time() + 30.0
+            while player.playState in [3, 9] and time.time() < playback_deadline:
+                pythoncom.PumpWaitingMessages()
+                time.sleep(0.05)
                 
             return True
         except Exception as e:
