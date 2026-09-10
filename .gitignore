@@ -1,14 +1,9 @@
 venv/
+.venv/
 __pycache__/
-
 *.pyc
-*.pyo
-*.pyd
-
+tts.mp3
+*.mp3
+.env
 *.pt
 
-.cache/
-.idea/
-.vscode/
-
-runs/

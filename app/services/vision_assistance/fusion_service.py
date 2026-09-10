@@ -1,0 +1,348 @@
+import re
+from typing import Any, Dict, List, Optional, Union
+
+
+class FusionService:
+    """
+    Multimodal Fusion & Relevance Engine for Eyera Smart Glasses.
+
+    1. Determines required visual capabilities based on user voice query and command.
+    2. Fuses live factual vision and OCR detections into concise, factual context for the LLM.
+    """
+
+    READING_COMMANDS = {
+        "READ_MENU", "READ_SIGN", "READ_TEXT", "READ_LABEL", "READ_MEDICINE",
+        "CONTINUE_READING", "READ_PRICE", "READ_EXPIRY", "READ_INGREDIENTS"
+    }
+
+    READING_KEYWORDS = {
+        "read", "text", "menu", "sign", "written", "words", "board",
+        "label", "book", "page", "price", "say", "saying", "letter",
+        "letters", "document", "ingredient", "ingredients", "nutrition"
+    }
+
+    OBJECT_COMMANDS = {
+        "DESCRIBE_OBJECT", "DESCRIBE_SCENE", "GET_COLOR", "COUNT_PEOPLE",
+        "COUNT_OBJECTS", "CONFIRM_OBJECT", "WHERE_AM_I", "FIND_OBJECT",
+        "START_NAVIGATION"
+    }
+
+    OBJECT_KEYWORDS = {
+        "where", "find", "is there", "what is", "look like", "see",
+        "chair", "table", "door", "bottle", "cup", "person", "car",
+        "obstacle", "around", "front", "left", "right", "behind",
+        "describe", "surroundings", "room", "item", "items",
+        "holding", "color", "colour", "brand", "shape", "material"
+    }
+
+    SAFETY_COMMANDS = {
+        "CHECK_OBSTACLE"
+    }
+
+    SAFETY_KEYWORDS = {
+        "safe", "cross", "stop", "danger", "warning", "approaching",
+        "close", "hit", "walk", "clear", "traffic", "vehicle"
+    }
+
+    # Daily-life commands that never need the camera.
+    NO_VISION_COMMANDS = {
+        "GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL"
+    }
+
+    # Non-vision commands (daily-life, general knowledge, assistant control, unknown)
+    NON_VISION_COMMANDS = {
+        "GET_TIME", "GET_DATE", "GET_DAY", "GET_FESTIVAL",
+        "GENERAL_QUERY", "WAKE_WORD", "CHECK_PRESENCE",
+        "REPEAT_LAST", "HELP", "STOP", "CANCEL", "STOP_READING",
+        "STOP_NAVIGATION", "UNKNOWN"
+    }
+
+    def __init__(self):
+        pass
+
+    def determine_requirements(self, command: str = "", user_query: str = "") -> Dict[str, Any]:
+        """
+        Determines which live vision models must be executed for this query.
+        Returns a dict: {'need_ocr': bool, 'need_objects': bool, 'need_depth': bool, 'capability': str}
+        """
+        cmd = command.upper().strip() if command else ""
+        query_lower = user_query.lower().strip()
+
+        # 0. Deterministic mapping when command is provided
+        if cmd:
+            if cmd in self.NON_VISION_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": False,
+                    "need_depth": False,
+                    "capability": "NONE"
+                }
+            if cmd in self.READING_COMMANDS:
+                return {
+                    "need_ocr": True,
+                    "need_objects": False,
+                    "need_depth": False,
+                    "capability": "OCR"
+                }
+            if cmd in self.SAFETY_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": True,
+                    "need_depth": True,
+                    "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
+                }
+            if cmd in self.OBJECT_COMMANDS:
+                return {
+                    "need_ocr": False,
+                    "need_objects": True,
+                    "need_depth": True,
+                    "capability": "OBJECT_DETECTION, DEPTH"
+                }
+
+        # If no explicit command is provided, check query intent
+        # Vision intents have higher priority than general query
+        words = set(re.findall(r"\b\w+\b", query_lower))
+
+        # Check for reading requests
+        if (
+            any(w in words for w in ["menu", "sign", "label", "medicine", "ingredient", "ingredients", "nutrition", "price", "expiry"])
+            or query_lower.startswith("read")
+            or "what does this sign say" in query_lower
+            or "what does that sign say" in query_lower
+            or "what is written" in query_lower
+            or "read the text" in query_lower
+        ):
+            return {
+                "need_ocr": True,
+                "need_objects": False,
+                "need_depth": False,
+                "capability": "OCR"
+            }
+
+        # Check for safety / obstacle requests
+        if (
+            "obstacle" in query_lower
+            or "is it safe" in query_lower
+            or "safe to walk" in query_lower
+            or "safe to cross" in query_lower
+            or "anything blocking" in query_lower
+            or "something blocking" in query_lower
+        ):
+            return {
+                "need_ocr": False,
+                "need_objects": True,
+                "need_depth": True,
+                "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
+            }
+
+        # Check for object / spatial / scene / visual understanding requests
+        if (
+            "in front of me" in query_lower
+            or "around me" in query_lower
+            or "what do you see" in query_lower
+            or "describe the scene" in query_lower
+            or "describe my surroundings" in query_lower
+            or query_lower.startswith("where is the ")
+            or query_lower.startswith("where is my ")
+            or query_lower.startswith("where is a ")
+            or query_lower.startswith("where are the ")
+            or query_lower.startswith("find the ")
+            or query_lower.startswith("find my ")
+            or query_lower.startswith("locate the ")
+            or query_lower.startswith("locate my ")
+            or "what color" in query_lower
+            or "what colour" in query_lower
+            or query_lower == "what is this"
+            or query_lower == "what is that"
+            or "what am i looking at" in query_lower
+            or "what am i seeing" in query_lower
+            or "what am i holding" in query_lower
+            or "what does this look like" in query_lower
+            or "what does that look like" in query_lower
+            or "what does this object look like" in query_lower
+            or "what brand is" in query_lower
+            or "what shape" in query_lower
+            or "what material" in query_lower
+            or "what is this made of" in query_lower
+            or "describe this object" in query_lower
+            or query_lower.startswith("is this a ")
+            or query_lower.startswith("is this an ")
+            or query_lower.startswith("is that a ")
+            or query_lower.startswith("is that an ")
+            or query_lower.startswith("how many people")
+            or query_lower.startswith("how many objects")
+        ):
+            return {
+                "need_ocr": False,
+                "need_objects": True,
+                "need_depth": True,
+                "capability": "OBJECT_DETECTION, DEPTH"
+            }
+
+        # Default fallback for daily info, general knowledge questions, assistant controls, and unknown queries: NO CAMERA
+        return {
+            "need_ocr": False,
+            "need_objects": False,
+            "need_depth": False,
+            "capability": "NONE"
+        }
+
+    def classify_intent(self, user_query: str, command: str = "") -> str:
+        """
+        Classifies the primary intent of the user's query.
+        """
+        cmd = command.upper().strip() if command else ""
+        if cmd in self.NO_VISION_COMMANDS:
+            return "DAILY_INFO"
+        if cmd in self.READING_COMMANDS:
+            return "READING"
+        if cmd in self.SAFETY_COMMANDS:
+            return "SAFETY"
+        if cmd in self.OBJECT_COMMANDS:
+            return "OBJECT_SEARCH"
+        if cmd in self.NON_VISION_COMMANDS:
+            return "GENERAL"
+
+        query_lower = user_query.lower()
+        words = set(re.findall(r"\b\w+\b", query_lower))
+        if (
+            bool(words.intersection(self.SAFETY_KEYWORDS))
+            or "obstacle" in query_lower
+            or "is it safe" in query_lower
+            or "safe to walk" in query_lower
+            or "safe to cross" in query_lower
+            or "approaching" in query_lower
+        ):
+            return "SAFETY"
+        if (
+            "read" in query_lower
+            or "sign" in query_lower
+            or "menu" in query_lower
+            or "label" in query_lower
+            or "text" in query_lower
+            or "what does this sign say" in query_lower
+        ):
+            return "READING"
+        if (
+            "in front of me" in query_lower
+            or "around me" in query_lower
+            or "where is" in query_lower
+            or "find " in query_lower
+            or "what do you see" in query_lower
+            or "what is this" in query_lower
+            or "what am i holding" in query_lower
+            or "what color" in query_lower
+            or "what colour" in query_lower
+        ):
+            return "OBJECT_SEARCH"
+
+        return "GENERAL"
+
+    def fuse(
+        self,
+        user_query: str,
+        visual_data: Optional[Union[Dict[str, Any], str]] = None,
+        command: str = ""
+    ) -> str:
+        """
+        Fuses user query and live visual observations into a strictly factual context string.
+        """
+        if not visual_data:
+            return "No visual perception data available from the camera."
+
+        if isinstance(visual_data, str):
+            return visual_data.strip()
+
+        intent = self.classify_intent(user_query, command=command)
+
+        if intent == "READING":
+            return self._format_reading_context(visual_data)
+        elif intent == "OBJECT_SEARCH":
+            return self._format_object_context(visual_data)
+        elif intent == "SAFETY":
+            return self._format_safety_context(visual_data)
+        else:
+            return self._format_general_context(visual_data)
+
+    def _get_ocr_text(self, data: Dict[str, Any]) -> str:
+        text = data.get("ocr_text", data.get("text", ""))
+        if isinstance(text, list):
+            text = ", ".join(str(t) for t in text if t)
+        return str(text).strip() if text else ""
+
+    def _get_objects(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return data.get("detected_objects", data.get("objects", []))
+
+    def _format_reading_context(self, data: Dict[str, Any]) -> str:
+        ocr_text = self._get_ocr_text(data)
+
+        if ocr_text:
+            return f"[Detected Text in Scene]:\n\"{ocr_text}\""
+        else:
+            return "[Detected Text in Scene]: No readable text was detected in the current camera frame."
+
+    def _format_object_context(self, data: Dict[str, Any]) -> str:
+        context_parts = []
+        objects = self._get_objects(data)
+
+        if objects:
+            obj_lines = []
+            for obj in objects:
+                label = obj.get("label", obj.get("name", "Object"))
+                pos = obj.get("position", "ahead")
+                dist = obj.get("distance", obj.get("depth", ""))
+                dist_str = f" at {dist}" if dist else ""
+                obj_lines.append(f"- {label} ({pos}{dist_str})")
+            context_parts.append("[Detected Objects & Positions]:\n" + "\n".join(obj_lines))
+        else:
+            context_parts.append("[Detected Objects]: No notable objects detected in the current camera view.")
+
+        warnings = data.get("warnings", [])
+        if warnings:
+            warn_lines = [f"- {w.get('message', 'Warning alert')}" for w in warnings if isinstance(w, dict)]
+            if warn_lines:
+                context_parts.append("[Active Proximity Warnings]:\n" + "\n".join(warn_lines))
+
+        return "\n\n".join(context_parts)
+
+    def _format_safety_context(self, data: Dict[str, Any]) -> str:
+        context_parts = []
+        warnings = data.get("warnings", [])
+        objects = self._get_objects(data)
+
+        if warnings:
+            warn_lines = [f"- {w.get('message', 'Warning')}" for w in warnings if isinstance(w, dict)]
+            if warn_lines:
+                context_parts.append("[CRITICAL SAFETY WARNINGS]:\n" + "\n".join(warn_lines))
+
+        if objects:
+            obj_lines = []
+            for obj in objects:
+                label = obj.get("label", obj.get("name", "Object"))
+                pos = obj.get("position", "ahead")
+                dist = obj.get("distance", obj.get("depth", ""))
+                dist_str = f" ({dist})" if dist else ""
+                obj_lines.append(f"- {label} located at {pos}{dist_str}")
+            context_parts.append("[Surrounding Objects in Path]:\n" + "\n".join(obj_lines))
+
+        if not warnings and not objects:
+            context_parts.append("[Safety Assessment]: Path appears clear of detected obstacles.")
+
+        return "\n\n".join(context_parts)
+
+    def _format_general_context(self, data: Dict[str, Any]) -> str:
+        context_parts = []
+
+        ocr_text = self._get_ocr_text(data)
+        if ocr_text:
+            context_parts.append(f"[Visible Text]: \"{ocr_text}\"")
+
+        objects = self._get_objects(data)
+        if objects:
+            obj_summary = ", ".join([f"{o.get('label', o.get('name'))} ({o.get('position')})" for o in objects])
+            context_parts.append(f"[Detected Objects]: {obj_summary}")
+
+        if not context_parts:
+            return "Camera frame analyzed: No notable objects or text detected in current view."
+
+        return "\n\n".join(context_parts)

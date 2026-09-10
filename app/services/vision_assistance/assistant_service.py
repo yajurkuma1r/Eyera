@@ -1,0 +1,187 @@
+import numpy as np
+from typing import Any, Dict, Optional, Union
+from app.models.assistant_response import AssistantResponse
+from app.services.vision_assistance.llm_service import LLMService
+from app.services.audio.tts_service import TTSService
+from app.services.vision_assistance.fusion_service import FusionService
+from app.services.vision_assistance.vision_service import VisionService
+from app.services.vision_assistance.camera_service import CameraService
+from app.services.vision_assistance.command_service import CommandService
+from app.services.vision_assistance.daily_info_service import DailyInfoService
+
+
+class AssistantService:
+    """
+    Main Live AI Assistant Service for Eyera (Vision Assistance Module).
+
+    Coordinates:
+    1. Intent-based vision capability determination (FusionService)
+    2. Live camera frame capture (CameraService)
+    3. Selective Vision & OCR perception (VisionService)
+    4. Multimodal context fusion (FusionService)
+    5. Factual LLM reasoning with live frame support (LLMService)
+    6. Real-time spoken output (TTSService)
+    """
+
+    def __init__(self, model: str = "gpt-4o-mini", mock: bool = False):
+        self.llm = LLMService(model=model, mock=mock)
+        self.tts = TTSService()
+        self.fusion = FusionService()
+        self.vision = VisionService()
+        self.camera = CameraService()
+        self.daily_info = DailyInfoService()
+        self.command_service = CommandService()
+
+    def process(
+        self,
+        user_query: str,
+        visual_context: str = "",
+        frame: Optional[np.ndarray] = None,
+        speak: bool = True
+    ) -> AssistantResponse:
+        """
+        Processes a query with an already formatted visual context string and optional camera frame.
+        """
+        response_text = self.llm.generate_response(
+            user_query=user_query,
+            visual_context=visual_context,
+            frame=frame
+        )
+
+        response = AssistantResponse(
+            text=response_text,
+            priority="NORMAL",
+            should_speak=speak
+        )
+
+        if response.should_speak:
+            self.tts.speak(response.text)
+
+        return response
+
+    def process_with_fusion(
+        self,
+        user_query: str,
+        raw_vision_data: Optional[Union[Dict[str, Any], str]] = None,
+        visual_context: str = "",
+        frame: Optional[np.ndarray] = None,
+        speak: bool = True
+    ) -> AssistantResponse:
+        """
+        Fuses visual perception data (if provided) and generates an AssistantResponse.
+        """
+        if raw_vision_data is not None and not visual_context:
+            visual_context = self.fusion.fuse(user_query=user_query, visual_data=raw_vision_data)
+        return self.process(user_query=user_query, visual_context=visual_context, frame=frame, speak=speak)
+
+    def process_live_query(
+        self,
+        user_query: str,
+        command: str = "",
+        frame: Optional[np.ndarray] = None,
+        speak: bool = True
+    ) -> AssistantResponse:
+        """
+        Executes the 100% LIVE vision assistant pipeline:
+        1. Determines needed vision capabilities from user command.
+        2. Captures live camera frame if not provided.
+        3. Runs YOLO / MiDaS / OCR selectively on the live frame.
+        4. Fuses factual visual data into LLM prompt.
+        5. Generates dynamic natural response and speaks it.
+
+        Daily-life commands (time / date / day / festival) and general
+        knowledge questions are answered without activating the camera.
+        """
+        if not command:
+            command = self.command_service.process_command(user_query)
+
+        # Handle daily-life commands directly from clock / calendar (NO CAMERA)
+        if command in self.fusion.NO_VISION_COMMANDS:
+            response_text = self.daily_info.answer(command)
+            response = AssistantResponse(
+                text=response_text,
+                priority="NORMAL",
+                should_speak=speak
+            )
+            if response.should_speak:
+                self.tts.speak(response.text)
+            return response
+
+        # Handle UNKNOWN command with safe clarification (NO CAMERA)
+        if command == "UNKNOWN":
+            response = AssistantResponse(
+                text="I didn't quite catch that. Could you please rephrase your request?",
+                priority="NORMAL",
+                should_speak=speak
+            )
+            if response.should_speak:
+                self.tts.speak(response.text)
+            return response
+
+        # Step 1: Determine required capabilities
+        reqs = self.fusion.determine_requirements(command=command, user_query=user_query)
+        need_ocr = reqs.get("need_ocr", False)
+        need_objects = reqs.get("need_objects", False)
+        need_depth = reqs.get("need_depth", False)
+
+        # Step 2: If no vision capability is required (e.g. GENERAL_QUERY),
+        # answer directly using the LLM without activating the camera.
+        if not need_ocr and not need_objects and not need_depth:
+            return self.process(
+                user_query=user_query,
+                visual_context="",
+                frame=None,
+                speak=speak
+            )
+
+        # Step 3: Capture live camera frame only when vision is required
+        if frame is None:
+            frame = self.camera.get_current_frame()
+
+        # Step 4: Run only the required vision models
+        visual_data = self.vision.process_live_frame(
+            frame=frame,
+            need_ocr=need_ocr,
+            need_objects=need_objects,
+            need_depth=need_depth
+        )
+
+        # Step 5: Fuse factual context
+        visual_context = self.fusion.fuse(
+            user_query=user_query,
+            visual_data=visual_data,
+            command=command
+        )
+
+        # Step 6 & 7: LLM reasoning and speech (with live frame passed to vision LLM)
+        return self.process(
+            user_query=user_query,
+            visual_context=visual_context,
+            frame=frame,
+            speak=speak
+        )
+
+
+def main():
+    assistant = AssistantService()
+    print("================================")
+    print("   EYERA LIVE AI ASSISTANT")
+    print("================================")
+    print("Type 'exit' to quit.\n")
+
+    while True:
+        user_query = input("You: ").strip()
+        if user_query.lower() == "exit":
+            break
+        if not user_query:
+            continue
+
+        try:
+            response = assistant.process_live_query(user_query=user_query)
+            print(f"Eyera: {response.text}")
+        except Exception as error:
+            print(f"[ERROR] {error}")
+
+
+if __name__ == "__main__":
+    main()

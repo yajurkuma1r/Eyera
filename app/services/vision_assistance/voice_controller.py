@@ -1,0 +1,73 @@
+from typing import Optional, Tuple
+import numpy as np
+from app.services.vision_assistance.speech_service import SpeechService
+from app.services.vision_assistance.command_service import CommandService
+from app.services.audio.tts_service import TTSService
+from app.services.vision_assistance.assistant_service import AssistantService
+from app.services.vision_assistance.concurrency_manager import concurrency_controller
+
+
+class VoiceController:
+    """
+    Voice Controller for Eyera Vision Assistance.
+    Listens for user speech, detects intent via CommandService,
+    and executes the live vision assistant pipeline under concurrency control.
+    """
+
+    def __init__(self, assistant_service: Optional[AssistantService] = None):
+        self.speech_service = SpeechService()
+        self.command_service = CommandService()
+        self.tts_service = TTSService()
+        self.assistant_service = assistant_service or AssistantService()
+
+    def listen_for_command(self) -> Tuple[str, str]:
+        """
+        Listens to the user's voice and extracts both transcribed text and command label.
+        Returns: (raw_text, command_label)
+        """
+        text = self.speech_service.listen()
+        if not text:
+            return "", "UNKNOWN"
+
+        command = self.command_service.process_command(text)
+        print(f"[VoiceController] Heard: \"{text}\" -> Command: [{command}]")
+        return text, command
+
+    def speak(self, message: str):
+        self.tts_service.speak(message)
+
+    def handle_command_live(self, text: str, command: str, frame: Optional[np.ndarray] = None) -> str:
+        """
+        Executes live vision understanding and LLM reasoning for the detected command.
+        """
+        response = self.assistant_service.process_live_query(
+            user_query=text,
+            command=command,
+            frame=frame,
+            speak=True
+        )
+        return response.text
+
+    def run_once(self, frame: Optional[np.ndarray] = None):
+        """
+        Executes a single live voice-in -> vision -> assistant -> TTS cycle
+        guarded by concurrency lock.
+        """
+        if concurrency_controller.is_busy:
+            return "BUSY", "Operation already in progress"
+
+        try:
+            with concurrency_controller.acquire_operation("VOICE_PIPELINE"):
+                text, command = self.listen_for_command()
+                if not text:
+                    return "UNKNOWN", "No speech detected"
+
+                response_text = self.handle_command_live(text, command, frame=frame)
+                return command, response_text
+        except RuntimeError as e:
+            print(f"[VoiceController] Concurrency notice: {e}")
+            return "BUSY", str(e)
+        except Exception as e:
+            print(f"[VoiceController Error] {e}")
+            return "ERROR", str(e)
+
