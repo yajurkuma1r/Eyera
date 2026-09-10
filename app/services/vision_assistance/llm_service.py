@@ -264,8 +264,8 @@ class LLMService:
                 return f"Caution! {match.group(1).strip()}."
 
         # 2. Text / OCR Reading
-        if "[Detected Text in Camera View]" in visual_context or "[Visible Text]" in visual_context:
-            match = re.search(r'\[(?:Detected Text in Camera View|Visible Text)\]:\s*(?:No readable text|"([^"]+)")', visual_context)
+        if "[Detected Text in Camera View]" in visual_context or "[Detected Text in Scene]" in visual_context or "[Visible Text]" in visual_context:
+            match = re.search(r'\[(?:Detected Text in Camera View|Detected Text in Scene|Visible Text)\]:\s*(?:No readable text|"([^"]+)")', visual_context)
             if match and match.group(1):
                 actual_text = match.group(1).strip()
                 if "menu" in query_lower:
@@ -283,7 +283,7 @@ class LLMService:
                 target_obj = word
                 break
 
-        if target_obj and ("[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects]" in visual_context):
+        if target_obj and ("[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects & Positions]" in visual_context or "[Detected Objects]" in visual_context):
             match = re.search(rf"-\s*({target_obj}[^\n]*)", visual_context, re.IGNORECASE)
             if match:
                 return f"I see a {match.group(1).strip()}."
@@ -291,7 +291,7 @@ class LLMService:
                 return f"I don't see any {target_obj} in front of you."
 
         # 4. General Object / Spatial Detection
-        if "[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects]" in visual_context:
+        if "[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects & Positions]" in visual_context or "[Detected Objects]" in visual_context:
             if "no notable objects" in visual_context.lower() or "no specific objects" in visual_context.lower():
                 return "I don't see any notable objects in front of you."
 

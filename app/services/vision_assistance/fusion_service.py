@@ -204,10 +204,14 @@ class FusionService:
             return "GENERAL"
 
         query_lower = user_query.lower()
+        words = set(re.findall(r"\b\w+\b", query_lower))
         if (
-            "obstacle" in query_lower
+            bool(words.intersection(self.SAFETY_KEYWORDS))
+            or "obstacle" in query_lower
             or "is it safe" in query_lower
             or "safe to walk" in query_lower
+            or "safe to cross" in query_lower
+            or "approaching" in query_lower
         ):
             return "SAFETY"
         if (
@@ -273,9 +277,9 @@ class FusionService:
         ocr_text = self._get_ocr_text(data)
 
         if ocr_text:
-            return f"[Detected Text in Camera View]:\n\"{ocr_text}\""
+            return f"[Detected Text in Scene]:\n\"{ocr_text}\""
         else:
-            return "[Detected Text in Camera View]: No readable text was detected in the current camera frame."
+            return "[Detected Text in Scene]: No readable text was detected in the current camera frame."
 
     def _format_object_context(self, data: Dict[str, Any]) -> str:
         context_parts = []
@@ -289,7 +293,7 @@ class FusionService:
                 dist = obj.get("distance", obj.get("depth", ""))
                 dist_str = f" at {dist}" if dist else ""
                 obj_lines.append(f"- {label} ({pos}{dist_str})")
-            context_parts.append("[Detected Objects & Spatial Positions]:\n" + "\n".join(obj_lines))
+            context_parts.append("[Detected Objects & Positions]:\n" + "\n".join(obj_lines))
         else:
             context_parts.append("[Detected Objects]: No notable objects detected in the current camera view.")
 
