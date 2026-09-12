@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eyera Smart Glasses — Central Launcher</title>
+    
+    <!-- Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-darkest: #07080b;
+            --bg-main: #0c0e15;
+            --bg-card: rgba(18, 22, 34, 0.75);
+            --bg-card-hover: rgba(26, 32, 50, 0.9);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            
+            --accent-blue: #3b82f6;
+            --accent-indigo: #6366f1;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-darkest);
+            background-image: 
+                radial-gradient(circle at 50% -10%, rgba(99, 102, 241, 0.22) 0%, transparent 60%),
+                radial-gradient(circle at 10% 90%, rgba(6, 182, 212, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.12) 0%, transparent 40%);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            padding: 18px 40px;
+            background: rgba(7, 8, 11, 0.8);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-cyan));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .brand-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            background: linear-gradient(135deg, #ffffff 30%, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            font-weight: 600;
+        }
+
+        .global-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-glass);
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #94a3b8;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 12px var(--accent-green);
+            animation: pulse-dot 1.8s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+        }
+
+        /* Main Container */
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 36px 24px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+        }
+
+        /* Active Mode Banner (Shown if a mode is running) */
+        #activeBanner {
+            display: none;
+            width: 100%;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: 16px;
+            padding: 16px 24px;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .banner-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .banner-pulse {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 14px var(--accent-green);
+            animation: pulse-dot 1.2s infinite;
+        }
+
+        .banner-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .banner-sub {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-stop {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-stop:hover {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-open {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border: none;
+            color: white;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-open:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            max-width: 680px;
+        }
+
+        .hero h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ffffff, #c7d2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Microphone Control */
+        .mic-hub {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mic-btn-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-ripple {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s ease;
+        }
+
+        .mic-btn {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            background: linear-gradient(145deg, #1e1b4b, #0f172a);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.25);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2;
+        }
+
+        .mic-btn:hover {
+            transform: scale(1.06);
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6), 0 0 35px rgba(99, 102, 241, 0.45);
+        }
+
+        .mic-btn.listening {
+            background: linear-gradient(145deg, #b91c1c, #7f1d1d);
+            border-color: rgba(239, 68, 68, 0.8);
+            box-shadow: 0 0 45px rgba(239, 68, 68, 0.7);
+            animation: pulse-mic 1.2s infinite alternate;
+        }
+
+        .mic-btn.listening + .mic-ripple {
+            opacity: 1;
+            transform: scale(1.4);
+            animation: ripple-out 1.5s infinite;
+        }
+
+        @keyframes pulse-mic {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        @keyframes ripple-out {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.7); opacity: 0; }
+        }
+
+        .mic-btn svg {
+            width: 38px;
+            height: 38px;
+            fill: white;
+        }
+
+        .voice-status-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-height: 48px;
+        }
+
+        .voice-status-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .voice-transcript {
+            font-size: 13px;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+            min-height: 18px;
+        }
+
+        .voice-tips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .voice-tip {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            padding: 5px 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .voice-tip:hover {
+            color: var(--text-primary);
+            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* Mode Cards Grid */
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .modes-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .mode-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 30px 26px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .card-object::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+        .card-navigation::before { background: linear-gradient(90deg, #3b82f6, #06b6d4); }
+        .card-vision::before { background: linear-gradient(90deg, #8b5cf6, #ec4899); }
+
+        .mode-card:hover {
+            transform: translateY(-5px);
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.14);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-icon-wrap {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-object .card-icon-wrap {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+        }
+
+        .card-navigation .card-icon-wrap {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+        }
+
+        .card-vision .card-icon-wrap {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #8b5cf6;
+        }
+
+        .card-icon-wrap svg {
+            width: 26px;
+            height: 26px;
+            fill: currentColor;
+        }
+
+        .card-badge {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            color: var(--text-muted);
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .card-desc {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .card-url-badge {
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-glass);
+            color: var(--accent-cyan);
+            margin-bottom: 22px;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .mode-launch-btn {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14.5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.25s;
+            border: none;
+            text-decoration: none;
+        }
+
+        .card-object .mode-launch-btn {
+            background: linear-gradient(135deg, #d97706, #b45309);
+            color: white;
+        }
+        .card-object .mode-launch-btn:hover {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
+        }
+
+        .card-navigation .mode-launch-btn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+        }
+        .card-navigation .mode-launch-btn:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+        }
+
+        .card-vision .mode-launch-btn {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+        }
+        .card-vision .mode-launch-btn:hover {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.35);
+        }
+
+        /* Loading Overlay during redirect */
+        #redirectOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(7, 8, 11, 0.92);
+            backdrop-filter: blur(16px);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 54px;
+            height: 54px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--accent-indigo);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .redirect-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .redirect-sub {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(18, 22, 34, 0.95);
+            border: 1px solid var(--border-glass);
+            border-left: 4px solid var(--accent-indigo);
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 2000;
+            pointer-events: none;
+        }
+
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+            </div>
+            <div>
+                <div class="brand-title">EYERA</div>
+                <div class="brand-sub">Central Mode Launcher</div>
+            </div>
+        </div>
+
+        <div class="global-status" id="headerStatusPill">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">STANDBY / HOME</span>
+        </div>
+    </header>
+
+    <main>
+        
+        <!-- Active Mode Indicator Banner -->
+        <div id="activeBanner">
+            <div class="banner-info">
+                <div class="banner-pulse"></div>
+                <div>
+                    <div class="banner-title" id="bannerTitle">Mode Currently Running</div>
+                    <div class="banner-sub" id="bannerSub">Running in background</div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <a href="#" id="bannerOpenBtn" class="btn-open" target="_self">↗ Go to Frontend</a>
+                <button class="btn-stop" onclick="stopActiveMode()">🛑 Stop Mode</button>
+            </div>
+        </div>
+
+        <!-- Hero -->
+        <div class="hero">
+            <h1>Global Mode Switcher</h1>
+            <p>Click any mode or use the microphone to stop currently active processes and redirect directly to that mode's native interface.</p>
+        </div>
+
+        <!-- Global Microphone Controller -->
+        <div class="mic-hub">
+            <div class="mic-btn-wrapper">
+                <button class="mic-btn" id="homeMicBtn" title="Click or Press [M] to Speak" onclick="toggleGlobalMic()">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+                <div class="mic-ripple"></div>
+            </div>
+
+            <div class="voice-status-box">
+                <div class="voice-status-label" id="voiceStatusLabel">Click Microphone or Press [M] to Speak</div>
+                <div class="voice-transcript" id="voiceTranscript"></div>
+            </div>
+
+            <div class="voice-tips">
+                <span class="voice-tip" onclick="simulateVoice('trigger navigation')">"trigger navigation"</span>
+                <span class="voice-tip" onclick="simulateVoice('trigger object AI')">"trigger object AI"</span>
+                <span class="voice-tip" onclick="simulateVoice('trigger vision assistance')">"trigger vision assistance"</span>
+                <span class="voice-tip" onclick="simulateVoice('stop')">"stop"</span>
+            </div>
+        </div>
+
+        <!-- Three Mode Cards -->
+        <div class="modes-grid">
+            
+            <!-- 1. OBJECT AI -->
+            <div class="mode-card card-object">
+                <div>
+                    <div class="card-header">
+                        <div class="card-icon-wrap">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                            </svg>
+                        </div>
+                        <span class="card-badge">Approach Detector</span>
+                    </div>
+                    <h3 class="card-title">Object AI</h3>
+                    <p class="card-desc">Real-time YOLOv8 object detection, ByteTrack tracking, and MiDaS monocular depth estimation. Detects approaching hazards with live audio alerts.</p>
+                    <div class="card-url-badge">OpenCV HUD Desktop Window</div>
+                </div>
+
+                <button class="mode-launch-btn" onclick="launchAndRedirect('object_ai')">
+                    <span>Launch Object AI</span>
+                    <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+                        <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 2. NAVIGATION -->
+            <div class="mode-card card-navigation">
+                <div>
+                    <div class="card-header">
+                        <div class="card-icon-wrap">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                            </svg>
+                        </div>
+                        <span class="card-badge">4-Screen Synced</span>
+                    </div>
+                    <h3 class="card-title">Navigation</h3>
+                    <p class="card-desc">Voice-first pedestrian routing with TomTom geocoding, turn-by-turn guidance, live map updates, and safety radar obstacle detection.</p>
+                    <div class="card-url-badge">Target: http://localhost:8000</div>
+                </div>
+
+                <button class="mode-launch-btn" onclick="launchAndRedirect('navigation')">
+                    <span>Launch &amp; Redirect (8000)</span>
+                    <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+                        <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 3. VISION ASSISTANCE -->
+            <div class="mode-card card-vision">
+                <div>
+                    <div class="card-header">
+                        <div class="card-icon-wrap">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+                            </svg>
+                        </div>
+                        <span class="card-badge">Multimodal AI</span>
+                    </div>
+                    <h3 class="card-title">Vision Assistance</h3>
+                    <p class="card-desc">Comprehensive visual assistant with OCR reading (menus, signs, medicines), spatial object queries, daily info, and LLM reasoning.</p>
+                    <div class="card-url-badge">Target: http://localhost:8001</div>
+                </div>
+
+                <button class="mode-launch-btn" onclick="launchAndRedirect('vision_assistance')">
+                    <span>Launch &amp; Redirect (8001)</span>
+                    <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+                        <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+                    </svg>
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Fullscreen Redirect Loading Overlay -->
+    <div id="redirectOverlay">
+        <div class="spinner"></div>
+        <div class="redirect-text" id="redirectText">Launching Mode...</div>
+        <div class="redirect-sub" id="redirectSub">Redirecting to target localhost...</div>
+    </div>
+
+    <!-- Toast message -->
+    <div id="toast"></div>
+
+    <script>
+        let currentActiveMode = null;
+        let isListening = false;
+        let speechRecognition = null;
+        let pollTimer = null;
+
+        const redirectOverlay = document.getElementById('redirectOverlay');
+        const redirectText = document.getElementById('redirectText');
+        const redirectSub = document.getElementById('redirectSub');
+
+        const activeBanner = document.getElementById('activeBanner');
+        const bannerTitle = document.getElementById('bannerTitle');
+        const bannerSub = document.getElementById('bannerSub');
+        const bannerOpenBtn = document.getElementById('bannerOpenBtn');
+
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        const homeMicBtn = document.getElementById('homeMicBtn');
+        const voiceStatusLabel = document.getElementById('voiceStatusLabel');
+        const voiceTranscript = document.getElementById('voiceTranscript');
+
+        // -------------------------------------------------------------
+        // Core Launch & Direct Redirect
+        // -------------------------------------------------------------
+        async function launchAndRedirect(mode) {
+            showRedirectOverlay(`Starting ${formatModeName(mode)}...`, "Stopping previous mode & initializing service...");
+
+            try {
+                const res = await fetch('/api/mode/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode })
+                });
+                const data = await res.json();
+                updateUIState(data);
+
+                if (mode === "object_ai") {
+                    hideRedirectOverlay();
+                    showToast("Object AI active in desktop window!");
+                } else if (data.frontend_url && data.frontend_url.startsWith("http")) {
+                    redirectSub.textContent = `Redirecting to ${data.frontend_url}...`;
+                    setTimeout(() => {
+                        window.location.href = data.frontend_url;
+                    }, 400);
+                } else {
+                    hideRedirectOverlay();
+                }
+            } catch (err) {
+                console.error("[Launch Error]", err);
+                hideRedirectOverlay();
+                showToast(`Failed to launch ${mode}`);
+            }
+        }
+
+        async function stopActiveMode() {
+            showToast("Stopping active mode...");
+            try {
+                const res = await fetch('/api/mode/stop', { method: 'POST' });
+                const data = await res.json();
+                updateUIState(data);
+                showToast("Returned to Eyera Home.");
+            } catch (err) {
+                console.error("[Stop Error]", err);
+                showToast("Error stopping mode.");
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                updateUIState(data);
+            } catch (err) {
+                // Ignore transient errors
+            }
+        }
+
+        function updateUIState(state) {
+            if (!state) return;
+
+            const mode = state.active_mode;
+            currentActiveMode = mode;
+
+            if (mode && state.is_running) {
+                statusDot.className = "status-dot active";
+                statusText.textContent = `${formatModeName(mode).toUpperCase()} ACTIVE`;
+
+                activeBanner.style.display = "flex";
+                bannerTitle.textContent = `${formatModeName(mode)} is Active`;
+
+                if (mode === "object_ai") {
+                    bannerSub.textContent = "OpenCV HUD window is running on your desktop.";
+                    bannerOpenBtn.style.display = "none";
+                } else {
+                    bannerSub.textContent = `Running on ${state.frontend_url}`;
+                    bannerOpenBtn.style.display = "inline-flex";
+                    bannerOpenBtn.href = state.frontend_url;
+                    bannerOpenBtn.textContent = `↗ Open ${formatModeName(mode)}`;
+                }
+            } else {
+                statusDot.className = "status-dot";
+                statusText.textContent = "STANDBY / HOME";
+                activeBanner.style.display = "none";
+            }
+        }
+
+        function showRedirectOverlay(title, subtitle) {
+            redirectText.textContent = title;
+            redirectSub.textContent = subtitle;
+            redirectOverlay.style.display = "flex";
+        }
+
+        function hideRedirectOverlay() {
+            redirectOverlay.style.display = "none";
+        }
+
+        // -------------------------------------------------------------
+        // Speech Recognition Setup
+        // -------------------------------------------------------------
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                speechRecognition = new SpeechRecognition();
+                speechRecognition.continuous = false;
+                speechRecognition.interimResults = true;
+                speechRecognition.lang = 'en-US';
+
+                speechRecognition.onstart = () => {
+                    setListeningUI(true);
+                };
+
+                speechRecognition.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    voiceTranscript.textContent = `"${transcript}"`;
+
+                    if (event.results[0].isFinal) {
+                        sendVoiceCommand(transcript);
+                    }
+                };
+
+                speechRecognition.onerror = (event) => {
+                    console.warn("[STT Error]", event.error);
+                    setListeningUI(false);
+                };
+
+                speechRecognition.onend = () => {
+                    setListeningUI(false);
+                };
+            }
+        }
+
+        function toggleGlobalMic() {
+            if (isListening) {
+                if (speechRecognition) speechRecognition.stop();
+                setListeningUI(false);
+            } else {
+                if (speechRecognition) {
+                    try {
+                        speechRecognition.start();
+                    } catch (e) {
+                        console.warn("[Mic start err]", e);
+                    }
+                } else {
+                    listenViaBackendMic();
+                }
+            }
+        }
+
+        function setListeningUI(listening) {
+            isListening = listening;
+            if (listening) {
+                homeMicBtn.classList.add('listening');
+                voiceStatusLabel.textContent = "Listening... Speak your command";
+                voiceTranscript.textContent = "";
+            } else {
+                homeMicBtn.classList.remove('listening');
+                voiceStatusLabel.textContent = "Click Microphone or Press [M] to Speak";
+            }
+        }
+
+        async function sendVoiceCommand(text) {
+            try {
+                showToast(`Heard: "${text}"`);
+                const res = await fetch('/api/voice-command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await res.json();
+                
+                showToast(data.message || `Executed: ${data.command}`);
+
+                if (data.command === "START_NAVIGATION") {
+                    launchAndRedirect("navigation");
+                } else if (data.command === "START_VISION_ASSISTANCE") {
+                    launchAndRedirect("vision_assistance");
+                } else if (data.command === "START_OBJECT_AI") {
+                    launchAndRedirect("object_ai");
+                } else if (data.command === "STOP") {
+                    updateUIState(data.state);
+                }
+            } catch (err) {
+                console.error("[Voice Command Error]", err);
+                showToast("Failed to process voice command.");
+            }
+        }
+
+        function simulateVoice(phrase) {
+            voiceTranscript.textContent = `"${phrase}"`;
+            sendVoiceCommand(phrase);
+        }
+
+        async function listenViaBackendMic() {
+            setListeningUI(true);
+            voiceStatusLabel.textContent = "Listening via hardware mic...";
+            try {
+                const res = await fetch('/api/voice-listen', { method: 'POST' });
+                const data = await res.json();
+                setListeningUI(false);
+                if (data.text) {
+                    voiceTranscript.textContent = `"${data.text}"`;
+                    showToast(data.message);
+                    if (data.command === "START_NAVIGATION") {
+                        launchAndRedirect("navigation");
+                    } else if (data.command === "START_VISION_ASSISTANCE") {
+                        launchAndRedirect("vision_assistance");
+                    } else if (data.command === "START_OBJECT_AI") {
+                        launchAndRedirect("object_ai");
+                    } else if (data.command === "STOP") {
+                        updateUIState(data.state);
+                    }
+                } else {
+                    showToast("No speech recognized.");
+                }
+            } catch (err) {
+                setListeningUI(false);
+                showToast("Error connecting to microphone.");
+            }
+        }
+
+        function formatModeName(mode) {
+            if (!mode) return "Home";
+            if (mode === "object_ai") return "Object AI";
+            if (mode === "navigation") return "Navigation";
+            if (mode === "vision_assistance") return "Vision Assistance";
+            return mode;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+
+            if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                toggleGlobalMic();
+            } else if (e.key === 'Escape' || e.key === 'h' || e.key === 'H') {
+                if (currentActiveMode) {
+                    e.preventDefault();
+                    stopActiveMode();
+                }
+            } else if (e.key === '1') {
+                launchAndRedirect('object_ai');
+            } else if (e.key === '2') {
+                launchAndRedirect('navigation');
+            } else if (e.key === '3') {
+                launchAndRedirect('vision_assistance');
+            }
+        });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            initSpeechRecognition();
+            pollStatus();
+            pollTimer = setInterval(pollStatus, 2000);
+        });
+    </script>
+</body>
+</html>

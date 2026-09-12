@@ -322,40 +322,21 @@ class VisionService:
                 class_id = int(detections.class_id[i])
                 object_name = self.yolo.names[class_id]
 
-                friendly_name = self.friendly_names.get(object_name, "Obstacle")
+                friendly_name = self.friendly_names.get(object_name, object_name.capitalize())
 
-                # Update approach history
+                # Update approach history (tracks moving objects like test_approach_detector)
                 status = self.approach_detector.update(
                     track_id=track_id,
                     depth=depth_value
                 )
 
-                is_ahead = left_bound <= center_x <= right_bound
-
-                # Generate warning conditions
-                # 1. Approaching (dynamic warning)
+                # Generate warning conditions - ONLY moving/approaching objects
                 if status == "CONFIRMED_APPROACHING":
                     warnings.append({
                         "type": "approaching",
                         "object": friendly_name,
                         "depth": depth_value,
                         "message": f"{friendly_name} approaching"
-                    })
-                # 2. Very Close (danger warning)
-                elif depth_value > self.very_close_threshold:
-                    warnings.append({
-                        "type": "very_close",
-                        "object": friendly_name,
-                        "depth": depth_value,
-                        "message": "Object very close"
-                    })
-                # 3. Directly Ahead in walking path and close
-                elif is_ahead and depth_value > self.close_threshold:
-                    warnings.append({
-                        "type": "ahead",
-                        "object": friendly_name,
-                        "depth": depth_value,
-                        "message": f"{friendly_name} ahead"
                     })
 
         # Bounding box annotation

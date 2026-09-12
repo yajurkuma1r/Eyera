@@ -14,6 +14,24 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 
+# Suppress harmless WinError 10054 disconnection noise on Windows
+if os.name == "nt":
+    from functools import wraps
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        _orig_call_connection_lost = _ProactorBasePipeTransport._call_connection_lost
+
+        @wraps(_orig_call_connection_lost)
+        def _silent_call_connection_lost(self, exc):
+            try:
+                _orig_call_connection_lost(self, exc)
+            except (ConnectionResetError, OSError):
+                pass
+
+        _ProactorBasePipeTransport._call_connection_lost = _silent_call_connection_lost
+    except Exception:
+        pass
+
 # Load environment variables (.env)
 load_dotenv()
 
@@ -324,12 +342,11 @@ def run_vision_ml_loop(session_obj: NavigationSession, tts: TTSService):
                 except Exception as ex:
                     print(f"[Vision Pipeline Thread Error]: {ex}")
                     
-            # Handle priority safety alerts speaking
+            # Handle priority safety alerts speaking (only moving/approaching objects like approach detector)
             if warnings and session_obj.active:
-                severity_map = {"approaching": 0, "very_close": 1, "ahead": 2}
-                valid_warnings = [w for w in warnings if "type" in w and "message" in w]
+                valid_warnings = [w for w in warnings if w.get("type") == "approaching" and "message" in w]
                 if valid_warnings:
-                    valid_warnings.sort(key=lambda w: (severity_map.get(w["type"], 3), -w.get("depth", 0)))
+                    valid_warnings.sort(key=lambda w: -w.get("depth", 0))
                     critical_warning = valid_warnings[0]
                     tts.speak(critical_warning["message"], priority=1)
                     
@@ -401,7 +418,7 @@ def run_camera_loop(session_obj: NavigationSession, tts: TTSService):
                     session_obj.annotated_frame = f"data:image/jpeg;base64,{frame_base64}"
             else:
                 # 1. Push frame reference to background ML processor
-                push_interval = 0.35 if session_obj.vision_mode == "smooth" else 0.15
+                push_interval = 0.15 if session_obj.vision_mode == "smooth" else 0.08
                 if current_time - last_process_push > push_interval:
                     with session_obj.lock:
                         if session_obj.next_frame_to_process is None:
@@ -491,26 +508,19 @@ def get_simulated_warnings(session_obj: NavigationSession):
             "depth": 340.0 + (t - 5) * 15,
             "message": "Car approaching"
         }]
-    elif 20 <= t <= 27:
+    elif 25 <= t <= 32:
         return [{
-            "type": "ahead",
-            "object": "Pole",
-            "depth": 315.0,
-            "message": "Pole ahead"
+            "type": "approaching",
+            "object": "Bicycle",
+            "depth": 315.0 + (t - 25) * 10,
+            "message": "Bicycle approaching"
         }]
-    elif 38 <= t <= 45:
+    elif 42 <= t <= 49:
         return [{
             "type": "approaching",
             "object": "Person",
-            "depth": 330.0 + (t - 38) * 12,
+            "depth": 330.0 + (t - 42) * 12,
             "message": "Person approaching"
-        }]
-    elif 52 <= t <= 56:
-        return [{
-            "type": "very_close",
-            "object": "Obstacle",
-            "depth": 520.0,
-            "message": "Obstacle very close"
         }]
     return []
 
@@ -656,24 +666,23 @@ def start_navigation_session(destination: str, origin: str, start_lat: float, st
     dest_data = tomtom_search(destination, start_lat, start_lon)
     
     if dest_data:
-        session.dest_coords = [dest_data["lon"], dest_data["lat"]]
-        session.destination = dest_data["name"]
-        
-        # Calculate pedestrian routes
+        dest_coords = [dest_data["lon"], dest_data["lat"]]
+        dest_name = dest_data["name"]
         route_data = tomtom_routing(start_lat, start_lon, dest_data["lat"], dest_data["lon"])
-        session.route_geometry = route_data["geometry"]
-        session.route_instructions = route_data["instructions"]
-        session.total_distance = route_data["total_distance"]
-        session.total_duration = route_data["total_duration"]
     else:
         # Fallback if geocoding fails
         print("[Navigation System] Destination not found. Routing with simulated markers.")
-        session.dest_coords = [start_lon + 0.0018, start_lat + 0.0014]
+        dest_coords = [start_lon + 0.0018, start_lat + 0.0014]
+        dest_name = destination
         route_data = get_fallback_route(start_lon, start_lat, destination)
-        session.route_geometry = route_data["geometry"]
-        session.route_instructions = route_data["instructions"]
-        session.total_distance = route_data["total_distance"]
-        session.total_duration = route_data["total_duration"]
+
+    with session.lock:
+        session.dest_coords = dest_coords
+        session.destination = dest_name
+        session.route_geometry = route_data.get("geometry", [])
+        session.route_instructions = route_data.get("instructions", [])
+        session.total_distance = route_data.get("total_distance", 0.0)
+        session.total_duration = route_data.get("total_duration", 0.0)
         
     # Launch navigation thread
     nav_thread = threading.Thread(

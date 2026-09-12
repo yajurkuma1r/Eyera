@@ -1,15 +1,12 @@
 """
-Eyera Smart Glasses — Unified Master Entry Point
-Runs the Global Central Controller & Launcher for:
-- Object AI (Approach Detector)
-- Navigation (4-Screen Synced Dashboard)
-- Vision Assistance (Multimodal AI & OCR)
+Eyera Global Application Launcher
+Main entrypoint to run the Eyera Central Controller & Mode Switcher.
 """
 
 import os
 import sys
 
-# Calculate project root directory
+# Ensure root is in sys.path
 root_dir = os.path.abspath(os.path.dirname(__file__))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
@@ -29,8 +26,7 @@ if os.path.exists(venv_python):
 
 from app.launcher.server import run_server
 
-
-def main():
+if __name__ == "__main__":
     port = 5000
     if len(sys.argv) > 1:
         try:
@@ -38,7 +34,3 @@ def main():
         except ValueError:
             pass
     run_server(port=port)
-
-
-if __name__ == "__main__":
-    main()

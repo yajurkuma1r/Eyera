@@ -20,6 +20,24 @@ os.chdir(root_dir)
 # Load env variables from .env
 load_dotenv()
 
+# Suppress harmless WinError 10054 disconnection noise on Windows
+if os.name == "nt":
+    from functools import wraps
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        _orig_call_connection_lost = _ProactorBasePipeTransport._call_connection_lost
+
+        @wraps(_orig_call_connection_lost)
+        def _silent_call_connection_lost(self, exc):
+            try:
+                _orig_call_connection_lost(self, exc)
+            except (ConnectionResetError, OSError):
+                pass
+
+        _ProactorBasePipeTransport._call_connection_lost = _silent_call_connection_lost
+    except Exception:
+        pass
+
 def open_browser():
     """
     Waits briefly for the server to start, then launches the default system browser
