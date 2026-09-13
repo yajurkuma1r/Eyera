@@ -174,6 +174,25 @@ class CommandService:
             or "what material is" in text
             or "what is this made of" in text
             or "what is that made of" in text
+            or "describe the person" in text
+            or "describe this person" in text
+            or "describe that person" in text
+            or "describe a person" in text
+            or "who is in front of me" in text
+            or "who is ahead of me" in text
+            or "who is standing" in text
+            or "what is the person" in text
+            or "what does the person look like" in text
+            or "what does that person look like" in text
+            or text.startswith("describe the person")
+            or text.startswith("describe this person")
+            or text.startswith("describe that person")
+            or text.startswith("describe the ")
+            or text.startswith("describe this ")
+            or text.startswith("describe that ")
+            or text.startswith("describe a ")
+            or text.startswith("describe an ")
+            or (text.startswith("describe ") and "surroundings" not in text and "scene" not in text)
         ):
             return "DESCRIBE_OBJECT"
 
@@ -200,6 +219,19 @@ class CommandService:
             or "locate a" in text
             or "locate an" in text
             or "where can i see" in text
+            or "do you see" in text
+            or "can you see" in text
+            or "do you spot" in text
+            or "can you spot" in text
+            or "can you find" in text
+            or "is there any" in text
+            or "are there any" in text
+            or "see any" in text
+            or "spot any" in text
+            or "is there a " in text
+            or "is there an " in text
+            or "look for" in text
+            or "search for" in text
         ):
             return "FIND_OBJECT"
 
@@ -217,6 +249,12 @@ class CommandService:
             or "tell me what's around me" in text
             or "tell me what's ahead" in text
             or "describe the scene" in text
+            or "what is ahead" in text
+            or "what's ahead" in text
+            or "describe what you see" in text
+            or "tell me what you see" in text
+            or "look around" in text
+            or "look ahead" in text
         ):
             return "DESCRIBE_SCENE"
 
@@ -436,7 +474,9 @@ class CommandService:
 
         # Questions that do not require the camera are sent directly
         # to the LLM for a general factual answer.
+        import re
 
+        words = text.split()
         if (
             text.startswith("who ")
             or text.startswith("who's ")
@@ -455,9 +495,22 @@ class CommandService:
             or text.startswith("could you tell me")
             or text.startswith("explain ")
             or text.startswith("tell me about")
+            or text.startswith("tell me ")
+            or text.startswith("give me ")
+            or text.startswith("suggest ")
+            or text.startswith("can i ")
+            or text.startswith("can you ")
+            or text.startswith("could you ")
+            or text.startswith("would you ")
+            or text.startswith("should i ")
             or text.startswith("define ")
             or text.startswith("meaning of ")
             or text.endswith("?")
+            or (
+                len(words) >= 2
+                and bool(re.search(r"[aeiouy]", text))
+                and not any(g in text for g in ["asdfghjk", "qwerty", "zxcvbn"])
+            )
         ):
             return "GENERAL_QUERY"
 

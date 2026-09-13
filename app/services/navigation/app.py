@@ -890,7 +890,6 @@ async def websocket_broadcast_task():
 def startup_event():
     # Speak greeting
     tts_service.speak("Navigation mode activated.", priority=2)
-    tts_service.speak("Where would you like to go?", priority=2)
     
     # Load vision models in background thread so startup isn't blocked
     def load_models_task():

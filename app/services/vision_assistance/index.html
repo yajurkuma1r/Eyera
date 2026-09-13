@@ -2,54 +2,400 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eyera Vision Assistant</title>
+    <style>
+        :root {
+            --bg-dark: #0c0e15;
+            --bg-card: rgba(18, 22, 34, 0.88);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 36px 40px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(14px);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 26px;
+        }
+
+        .mic-section {
+            margin: 20px 0 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .mic-btn {
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-size: 15.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 2px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+            outline: none;
+            width: 100%;
+            max-width: 340px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .btn-idle {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #ffffff;
+        }
+
+        .btn-idle:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: #3b82f6;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45);
+            transform: translateY(-2px);
+        }
+
+        .btn-listening {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            border-color: #ef4444;
+            color: #ffffff;
+            animation: pulse-listening 1.3s infinite;
+        }
+
+        .btn-listening:hover {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+        }
+
+        .btn-busy {
+            background: linear-gradient(135deg, #4b5563, #374151);
+            border-color: rgba(245, 158, 11, 0.6);
+            color: #f3f4f6;
+        }
+
+        .btn-busy:hover {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+
+        .stop-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+            width: 100%;
+            max-width: 220px;
+        }
+
+        .stop-btn:hover {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.45);
+            transform: translateY(-1px);
+        }
+
+        @keyframes pulse-listening {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+            }
+            50% {
+                transform: scale(1.03);
+                box-shadow: 0 0 28px rgba(239, 68, 68, 0.9);
+            }
+        }
+
+        .hint-text {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            min-height: 20px;
+            line-height: 1.4;
+        }
+
+        .status-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: left;
+            font-size: 13.5px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+    </style>
 </head>
 <body>
-    <h1>Eyera Vision Assistant Control</h1>
-    <p>Listening Status: <strong id="statusText">Disabled</strong></p>
-    <p>Pipeline Status: <strong id="pipelineText">Idle</strong></p>
-    
-    <button id="enableListenBtn" onclick="toggleListening()">Enable Listen</button>
+    <div class="container">
+        <h1>Eyera Vision Assistant Control</h1>
+        <p class="subtitle">Push-to-Listen Voice Controller</p>
+        
+        <div class="mic-section">
+            <div class="button-group">
+                <button id="enableListenBtn" class="mic-btn btn-idle" onclick="handleMainButtonClick()">
+                    🎤 Click to Speak
+                </button>
+                <button id="stopBtn" class="stop-btn" onclick="stopListening()">
+                    🛑 Stop Listening
+                </button>
+            </div>
+            <div id="micHintText" class="hint-text">Microphone is idle. Click "Click to Speak" to issue a command.</div>
+        </div>
+
+        <div class="status-box">
+            <div class="status-row">
+                <span class="status-label">Listening Status:</span>
+                <strong id="statusText" class="status-value">Disabled</strong>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Pipeline Status:</span>
+                <strong id="pipelineText" class="status-value">Idle</strong>
+            </div>
+        </div>
+    </div>
 
     <script>
+        // State Machine: 'IDLE' | 'LISTENING' | 'PROCESSING_SPEAKING' | 'SYNCING'
+        let appState = 'IDLE';
+        let listeningStartTime = 0;
+        let isPerformingAction = false;
+
+        const mainBtn = document.getElementById('enableListenBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusText = document.getElementById('statusText');
+        const pipelineText = document.getElementById('pipelineText');
+        const hintText = document.getElementById('micHintText');
+
+        function renderUI() {
+            if (appState === 'IDLE') {
+                mainBtn.className = 'mic-btn btn-idle';
+                mainBtn.innerHTML = '🎤 Click to Speak';
+                stopBtn.style.display = 'none';
+                statusText.textContent = 'Disabled';
+                pipelineText.textContent = 'Idle';
+                hintText.textContent = 'Microphone is idle. Click "Click to Speak" to issue a command.';
+            } else if (appState === 'LISTENING') {
+                mainBtn.className = 'mic-btn btn-listening';
+                mainBtn.innerHTML = '🔴 Listening... (Click to Stop)';
+                stopBtn.style.display = 'inline-block';
+                statusText.textContent = 'Enabled (Listening...)';
+                pipelineText.textContent = 'Listening for voice command...';
+                hintText.textContent = 'Speak your command now into the microphone.';
+            } else if (appState === 'PROCESSING_SPEAKING') {
+                mainBtn.className = 'mic-btn btn-busy';
+                mainBtn.innerHTML = '⏳ Processing / Speaking... (Click to Stop)';
+                stopBtn.style.display = 'inline-block';
+                statusText.textContent = 'Disabled (Microphone Off)';
+                pipelineText.textContent = 'Busy (Processing / Speaking)';
+                hintText.textContent = 'Assistant is processing or speaking. Microphone is off.';
+            } else if (appState === 'SYNCING') {
+                mainBtn.className = 'mic-btn btn-busy';
+                mainBtn.innerHTML = '⏳ Syncing with Backend...';
+                stopBtn.style.display = 'inline-block';
+                statusText.textContent = 'Synchronizing...';
+                pipelineText.textContent = 'Waiting for backend idle...';
+                hintText.textContent = 'Disarming initial startup loop. Please wait...';
+            }
+        }
+
+        async function handleMainButtonClick() {
+            if (isPerformingAction) return;
+
+            if (appState === 'IDLE') {
+                // User clicks to start listening
+                isPerformingAction = true;
+                try {
+                    appState = 'LISTENING';
+                    listeningStartTime = Date.now();
+                    renderUI();
+
+                    await fetch('/api/enable-listen', { method: 'POST' });
+                } catch (err) {
+                    console.error("Error starting listening:", err);
+                    await stopListening();
+                } finally {
+                    isPerformingAction = false;
+                }
+            } else {
+                // If clicked while listening, processing, or syncing: acts as stop/cancel
+                await stopListening();
+            }
+        }
+
+        async function stopListening() {
+            try {
+                // Always disarm listening on backend
+                await fetch('/api/disable-listen', { method: 'POST' });
+            } catch (err) {
+                console.error("Error disabling listening:", err);
+            }
+            appState = 'IDLE';
+            listeningStartTime = 0;
+            renderUI();
+            hintText.textContent = 'Stopped. Microphone is off.';
+        }
+
         async function updateStatus() {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
-                const btn = document.getElementById('enableListenBtn');
-                const statusText = document.getElementById('statusText');
-                const pipelineText = document.getElementById('pipelineText');
 
-                if (data.listening_enabled) {
-                    btn.textContent = "Disable Listen";
-                    statusText.textContent = "Enabled (Active)";
-                } else {
-                    btn.textContent = "Enable Listen";
-                    statusText.textContent = "Disabled";
-                }
+                const now = Date.now();
 
-                if (data.is_busy) {
-                    pipelineText.textContent = "Busy (Processing / Speaking)";
-                } else {
-                    pipelineText.textContent = "Idle";
+                if (appState === 'SYNCING') {
+                    // Waiting for initial startup cycle to finish
+                    if (!data.is_busy) {
+                        appState = 'IDLE';
+                        renderUI();
+                    } else {
+                        // Keep ensuring listening is disabled so it won't repeat
+                        if (data.listening_enabled) {
+                            fetch('/api/disable-listen', { method: 'POST' }).catch(console.error);
+                        }
+                    }
+                } else if (appState === 'LISTENING') {
+                    // User initiated listening:
+                    // The backend needs time to calibrate and capture speech.
+                    // Keep frontend in LISTENING state while the user speaks.
+                    const elapsed = now - listeningStartTime;
+
+                    if (elapsed > 3500) {
+                        // Once speech capture window completes and backend is busy processing/speaking:
+                        if (data.is_busy) {
+                            appState = 'PROCESSING_SPEAKING';
+                            renderUI();
+                            // Immediately disarm backend listening so it will NEVER auto-loop
+                            fetch('/api/disable-listen', { method: 'POST' }).catch(console.error);
+                        } else {
+                            // If backend is already idle (e.g. no speech detected / timeout)
+                            appState = 'IDLE';
+                            renderUI();
+                        }
+                    } else if (elapsed > 800 && !data.is_busy && data.listening_enabled === false) {
+                        // If backend already returned early before 3.5s
+                        appState = 'IDLE';
+                        renderUI();
+                    }
+                } else if (appState === 'PROCESSING_SPEAKING') {
+                    // While busy, ensure backend listening is turned off
+                    if (data.listening_enabled) {
+                        fetch('/api/disable-listen', { method: 'POST' }).catch(console.error);
+                    }
+                    // When backend pipeline finishes LLM & TTS speaking
+                    if (!data.is_busy) {
+                        appState = 'IDLE';
+                        renderUI();
+                    }
+                } else if (appState === 'IDLE') {
+                    // In IDLE, if backend was somehow enabled, disarm it
+                    if (data.listening_enabled) {
+                        fetch('/api/disable-listen', { method: 'POST' }).catch(console.error);
+                    }
                 }
             } catch (err) {
                 console.error("Error fetching status:", err);
             }
         }
 
-        async function toggleListening() {
+        // Initialize on page load:
+        // Immediately disarm backend's default startup listening loop.
+        async function init() {
+            renderUI();
             try {
-                const response = await fetch('/api/enable-listen', { method: 'POST' });
-                const data = await response.json();
-                updateStatus();
-            } catch (err) {
-                console.error("Error toggling listening:", err);
+                // Immediately turn off listening so backend does not continuously loop
+                await fetch('/api/disable-listen', { method: 'POST' });
+                
+                // Check if backend was already in the middle of a startup cycle
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                if (data.is_busy) {
+                    appState = 'SYNCING';
+                    renderUI();
+                } else {
+                    appState = 'IDLE';
+                    renderUI();
+                }
+            } catch (e) {
+                console.warn("Init error:", e);
+                appState = 'IDLE';
+                renderUI();
             }
+
+            setInterval(updateStatus, 300);
         }
 
-        setInterval(updateStatus, 1000);
-        updateStatus();
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

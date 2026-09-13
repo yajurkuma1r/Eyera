@@ -71,27 +71,47 @@ class FusionService:
         # 0. Deterministic mapping when command is provided
         if cmd:
             if cmd in self.NON_VISION_COMMANDS:
-                return {
-                    "need_ocr": False,
-                    "need_objects": False,
-                    "need_depth": False,
-                    "capability": "NONE"
-                }
-            if cmd in self.READING_COMMANDS:
+                # If command was classified as GENERAL_QUERY or UNKNOWN, check if the query actually contains visual keywords
+                if cmd in ("GENERAL_QUERY", "UNKNOWN") and query_lower:
+                    pass  # Fall through to visual query intent checks below!
+                else:
+                    return {
+                        "need_ocr": False,
+                        "need_objects": False,
+                        "need_depth": False,
+                        "capability": "NONE"
+                    }
+            elif cmd in self.READING_COMMANDS:
                 return {
                     "need_ocr": True,
                     "need_objects": False,
                     "need_depth": False,
                     "capability": "OCR"
                 }
-            if cmd in self.SAFETY_COMMANDS:
+            elif cmd in self.SAFETY_COMMANDS:
                 return {
                     "need_ocr": False,
                     "need_objects": True,
                     "need_depth": True,
                     "capability": "OBJECT_DETECTION, DEPTH, SAFETY"
                 }
-            if cmd in self.OBJECT_COMMANDS:
+            elif cmd in self.OBJECT_COMMANDS:
+                # If the query asks about a brand, cafe, store, sign, or readable text, enable OCR as well
+                has_text_indicator = any(
+                    w in query_lower
+                    for w in [
+                        "sign", "board", "text", "read", "written", "name", "brand",
+                        "starbucks", "cafe", "coffee", "store", "shop", "restaurant",
+                        "pharmacy", "bank", "atm", "hotel", "exit", "entry", "menu", "logo"
+                    ]
+                )
+                if has_text_indicator:
+                    return {
+                        "need_ocr": True,
+                        "need_objects": True,
+                        "need_depth": True,
+                        "capability": "OBJECT_DETECTION, DEPTH, OCR"
+                    }
                 return {
                     "need_ocr": False,
                     "need_objects": True,
@@ -139,9 +159,30 @@ class FusionService:
         if (
             "in front of me" in query_lower
             or "around me" in query_lower
+            or "ahead of me" in query_lower
             or "what do you see" in query_lower
             or "describe the scene" in query_lower
             or "describe my surroundings" in query_lower
+            or "describe the person" in query_lower
+            or "describe this person" in query_lower
+            or "describe that person" in query_lower
+            or "describe person" in query_lower
+            or "person ahead" in query_lower
+            or "person in front" in query_lower
+            or "who is in front" in query_lower
+            or "who is ahead" in query_lower
+            or "do you see" in query_lower
+            or "can you see" in query_lower
+            or "do you spot" in query_lower
+            or "can you spot" in query_lower
+            or "see any" in query_lower
+            or "spot any" in query_lower
+            or "is there any" in query_lower
+            or "are there any" in query_lower
+            or "starbucks" in query_lower
+            or "cafe" in query_lower
+            or "describe what you see" in query_lower
+            or query_lower.startswith("describe ")
             or query_lower.startswith("where is the ")
             or query_lower.startswith("where is my ")
             or query_lower.startswith("where is a ")
@@ -172,11 +213,12 @@ class FusionService:
             or query_lower.startswith("how many people")
             or query_lower.startswith("how many objects")
         ):
+            need_ocr = any(w in query_lower for w in ["sign", "starbucks", "cafe", "store", "shop", "menu", "text", "read", "written", "brand", "board"])
             return {
-                "need_ocr": False,
+                "need_ocr": need_ocr,
                 "need_objects": True,
                 "need_depth": True,
-                "capability": "OBJECT_DETECTION, DEPTH"
+                "capability": "OBJECT_DETECTION, DEPTH, OCR" if need_ocr else "OBJECT_DETECTION, DEPTH"
             }
 
         # Default fallback for daily info, general knowledge questions, assistant controls, and unknown queries: NO CAMERA
@@ -201,7 +243,8 @@ class FusionService:
         if cmd in self.OBJECT_COMMANDS:
             return "OBJECT_SEARCH"
         if cmd in self.NON_VISION_COMMANDS:
-            return "GENERAL"
+            if not (cmd in ("GENERAL_QUERY", "UNKNOWN") and user_query):
+                return "GENERAL"
 
         query_lower = user_query.lower()
         words = set(re.findall(r"\b\w+\b", query_lower))
@@ -226,6 +269,7 @@ class FusionService:
         if (
             "in front of me" in query_lower
             or "around me" in query_lower
+            or "ahead of me" in query_lower
             or "where is" in query_lower
             or "find " in query_lower
             or "what do you see" in query_lower
@@ -233,6 +277,12 @@ class FusionService:
             or "what am i holding" in query_lower
             or "what color" in query_lower
             or "what colour" in query_lower
+            or "describe" in query_lower
+            or "do you see" in query_lower
+            or "can you see" in query_lower
+            or "see any" in query_lower
+            or "starbucks" in query_lower
+            or "cafe" in query_lower
         ):
             return "OBJECT_SEARCH"
 

@@ -71,7 +71,7 @@ class LLMService:
                     api_key=gemini_key,
                     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
                 )
-                self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                self.model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
                 print(f"[LLM] Multimodal Vision LLM active via Gemini ({self.model}). Real camera frames will be analyzed.")
             except Exception as e:
                 print(f"[LLM] Gemini init notice ({e}). Using live local response synthesizer.")
@@ -158,14 +158,46 @@ class LLMService:
                         f"Please answer the question concisely and accurately in 1 to 3 natural conversational spoken sentences."
                     )
 
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    max_tokens=1000
-                )
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        max_tokens=1000
+                    )
+                except Exception as api_err:
+                    err_str = str(api_err)
+                    match = re.search(r"models/(gemini-[a-zA-Z0-9.-]+)", err_str)
+                    fallback_models = []
+                    if match:
+                        suggested = match.group(1)
+                        if suggested != self.model:
+                            fallback_models.append(suggested)
+                    for m in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+                        if m not in fallback_models and m != self.model:
+                            fallback_models.append(m)
+
+                    retry_success = False
+                    for fb_model in fallback_models:
+                        try:
+                            response = self.client.chat.completions.create(
+                                model=fb_model,
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_content}
+                                ],
+                                max_tokens=1000
+                            )
+                            self.model = fb_model
+                            retry_success = True
+                            break
+                        except Exception:
+                            continue
+
+                    if not retry_success:
+                        raise api_err
                 raw_text = response.choices[0].message.content.strip()
                 # Clean up any markdown bold/asterisks for smooth TTS playback
                 cleaned_text = re.sub(r"\*+", "", raw_text)
@@ -276,7 +308,15 @@ class LLMService:
             elif "no readable text" in visual_context.lower():
                 return "I couldn't detect any readable text in the camera view."
 
-        # 3. Specific Object query (e.g. "Where is the chair?", "Where is the door?", "What color is the bottle?")
+        # 3. Store / Cafe / Brand query
+        for brand in ["starbucks", "cafe", "coffee"]:
+            if brand in query_lower:
+                if brand in visual_context.lower():
+                    return f"Yes, I see a {brand.title()} in front of you."
+                elif "no notable objects" in visual_context.lower() or "no readable text" in visual_context.lower() or not any(brand in l.lower() for l in visual_context.splitlines()):
+                    return f"I don't see any {brand.title()} in front of you."
+
+        # 4. Specific Object query (e.g. "Where is the chair?", "Where is the door?", "What color is the bottle?", "Describe the person")
         target_obj = None
         for word in ["chair", "door", "table", "person", "bottle", "cup", "car", "laptop", "cell phone", "phone", "book", "box", "bag"]:
             if word in query_lower:
@@ -286,6 +326,8 @@ class LLMService:
         if target_obj and ("[Detected Objects & Spatial Positions]" in visual_context or "[Detected Objects & Positions]" in visual_context or "[Detected Objects]" in visual_context):
             match = re.search(rf"-\s*({target_obj}[^\n]*)", visual_context, re.IGNORECASE)
             if match:
+                if "describe" in query_lower:
+                    return f"In front of you, I see a {match.group(1).strip()}."
                 return f"I see a {match.group(1).strip()}."
             else:
                 return f"I don't see any {target_obj} in front of you."

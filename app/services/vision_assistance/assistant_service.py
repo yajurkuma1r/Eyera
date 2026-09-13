@@ -109,14 +109,25 @@ class AssistantService:
 
         # Handle UNKNOWN command with safe clarification (NO CAMERA)
         if command == "UNKNOWN":
-            response = AssistantResponse(
-                text="I didn't quite catch that. Could you please rephrase your request?",
-                priority="NORMAL",
-                should_speak=speak
+            import re
+            cleaned = user_query.strip().lower()
+            words = cleaned.split()
+            is_gibberish = (
+                len(words) < 2
+                or not bool(re.search(r"[aeiouy]", cleaned))
+                or any(g in cleaned for g in ["asdfghjk", "qwerty", "zxcvbn"])
             )
-            if response.should_speak:
-                self.tts.speak(response.text)
-            return response
+            if not is_gibberish:
+                command = "GENERAL_QUERY"
+            else:
+                response = AssistantResponse(
+                    text="I didn't quite catch that. Could you please rephrase your request?",
+                    priority="NORMAL",
+                    should_speak=speak
+                )
+                if response.should_speak:
+                    self.tts.speak(response.text)
+                return response
 
         # Step 1: Determine required capabilities
         reqs = self.fusion.determine_requirements(command=command, user_query=user_query)

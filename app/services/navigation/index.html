@@ -926,6 +926,9 @@
 
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
             fetchConfig();
             initWebSocket();
             initSpeechRecognition();
@@ -993,7 +996,9 @@
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === "speech") {
-                    speakTextFrontend(data.text);
+                    // Backend TTSService has already generated and played the audio on the host system.
+                    // Do NOT trigger browser SpeechSynthesis here to prevent duplicate voice output.
+                    console.log("[TTS Spoken by Backend]:", data.text);
                 } else {
                     synchronizeScreens(data);
                 }
@@ -1347,9 +1352,6 @@
                 const mic = document.getElementById("mic-trigger-btn");
                 mic.classList.add("recording");
                 document.getElementById("voice-transcript").innerText = "Listening... speak now";
-                
-                // Speak audio cue through backend TTS (optional debug check)
-                socket.send(JSON.stringify({ action: "speak", text: "Where would you like to go?" }));
             };
             
             recognition.onresult = (event) => {
@@ -1522,42 +1524,41 @@
             }
         }
 
-        // Manual speak next direction prompt
+        // Manual speak next direction prompt (Instant voice output on click)
         function speakNextDirection() {
-            if (!sessionActive) {
-                speakTextFrontend("Navigation is currently idle. Please set a destination first.");
-                return;
-            }
-            
             let textToSpeak = "";
-            if (distanceToNext > 0) {
+            if (!sessionActive) {
+                textToSpeak = "Navigation is currently idle. Please set a destination first.";
+            } else if (distanceToNext > 0) {
                 textToSpeak = `In ${Math.round(distanceToNext)} metres, ${currentInstruction}`;
             } else {
                 textToSpeak = currentInstruction;
             }
             
-            speakTextFrontend(textToSpeak);
+            // Speak immediately in browser with zero network or queue delay
+            speakTextInstantly(textToSpeak);
         }
 
-        // Voice output via Web Speech API in frontend browser
-        function speakTextFrontend(text) {
+        // Voice output via Web Speech API in browser (instant playback)
+        function speakTextInstantly(text) {
             if ('speechSynthesis' in window) {
-                // Cancel any ongoing speech to avoid overlap
                 window.speechSynthesis.cancel();
                 
                 const utterance = new SpeechSynthesisUtterance(text);
                 const voices = window.speechSynthesis.getVoices();
-                // Prefer a natural-sounding English voice if available
-                const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+                const naturalVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Aria') || v.name.includes('Jenny') || v.name.includes('Zira') || v.name.includes('Online')));
+                const englishVoice = naturalVoice || voices.find(voice => voice.lang.startsWith('en'));
                 if (englishVoice) {
                     utterance.voice = englishVoice;
                 }
                 utterance.rate = 1.0;
                 window.speechSynthesis.speak(utterance);
-                console.log("[SpeechSynthesis] Spoke in browser: ", text);
-            } else {
-                console.warn("[SpeechSynthesis] Web Speech API is not supported in this browser.");
+                console.log("[Instant Direction Spoken]:", text);
             }
+        }
+
+        function speakTextFrontend(text) {
+            speakTextInstantly(text);
         }
 
         // HTML5 canvas drawing in case TomTom API credentials fail
